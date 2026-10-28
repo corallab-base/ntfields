@@ -1,0 +1,51 @@
+[project]
+name = "ntfz"
+version = "0.1.0.dev0"
+description = "Physics-informed neural travel-time fields for motion planning"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "h5py>=3.10",
+    "numpy>=1.26",
+    "torch>=2.4",
+]
+
+[project.optional-dependencies]
+cli = ["tyro>=0.9"]
+gt = ["scikit-fmm>=2024.5.29"]
+
+[project.scripts]
+ntfz = "ntfz.cli:main"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.400",
+    "pytest>=8.3",
+    "ruff>=0.14",
+    "scikit-fmm>=2024.5.29",
+    "tyro>=0.9",
+]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.11"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ANN", "RUF"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN201"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
