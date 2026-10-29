@@ -1,0 +1,16 @@
+name: python 3.11
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    uses: ./.github/workflows/_tests.yml
+    with:
+      python: "3.11"

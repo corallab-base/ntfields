@@ -1,5 +1,12 @@
 # ntfields
 
+[![ruff](https://github.com/corallab-base/ntfields/actions/workflows/ruff.yml/badge.svg?branch=main)](https://github.com/corallab-base/ntfields/actions/workflows/ruff.yml)
+[![pyright](https://github.com/corallab-base/ntfields/actions/workflows/pyright.yml/badge.svg?branch=main)](https://github.com/corallab-base/ntfields/actions/workflows/pyright.yml)
+[![python 3.11](https://github.com/corallab-base/ntfields/actions/workflows/tests-3.11.yml/badge.svg?branch=main)](https://github.com/corallab-base/ntfields/actions/workflows/tests-3.11.yml)
+[![python 3.12](https://github.com/corallab-base/ntfields/actions/workflows/tests-3.12.yml/badge.svg?branch=main)](https://github.com/corallab-base/ntfields/actions/workflows/tests-3.12.yml)
+[![python 3.13](https://github.com/corallab-base/ntfields/actions/workflows/tests-3.13.yml/badge.svg?branch=main)](https://github.com/corallab-base/ntfields/actions/workflows/tests-3.13.yml)
+[![python 3.14](https://github.com/corallab-base/ntfields/actions/workflows/tests-3.14.yml/badge.svg?branch=main)](https://github.com/corallab-base/ntfields/actions/workflows/tests-3.14.yml)
+
 Physics-informed neural travel-time fields (the NTFields lineage) with a shared problem definition, trainer,
 planners and benchmark.
 
@@ -7,6 +14,8 @@ Implemented methods:
 - `euclidean`: a sanity baseline
 - `td_ntfields`: TD-NTFields, matched against the reference code (see
   [its README](src/ntfields/methods/td_ntfields/README.md))
+- `pntfields`: P-NTFields, matched against the reference code (see
+  [its README](src/ntfields/methods/pntfields/README.md))
 
 ## Install
 
