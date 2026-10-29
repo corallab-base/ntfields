@@ -6,3 +6,6 @@ __pycache__/
 dist/
 runs/
 *.h5
+docs/
+CLAUDE.md
+tests/private/

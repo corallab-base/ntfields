@@ -1,5 +1,5 @@
 [project]
-name = "ntfz"
+name = "ntfields"
 version = "0.1.0.dev0"
 description = "Physics-informed neural travel-time fields for motion planning"
 readme = "README.md"
@@ -11,16 +11,19 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+arm = ["pytorch-kinematics>=0.7"]
 cli = ["tyro>=0.9"]
 gt = ["scikit-fmm>=2024.5.29"]
 
 [project.scripts]
-ntfz = "ntfz.cli:main"
+ntfields = "ntfields.cli:main"
 
 [dependency-groups]
 dev = [
+    "matplotlib>=3.11.2",
     "pyright>=1.1.400",
     "pytest>=8.3",
+    "pytorch-kinematics>=0.7",
     "ruff>=0.14",
     "scikit-fmm>=2024.5.29",
     "tyro>=0.9",
@@ -44,8 +47,11 @@ ignore = ["ANN401"]
 
 [tool.pyright]
 include = ["src", "tests"]
+exclude = ["tests/private"]
 pythonVersion = "3.11"
 typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore:input's size at dim=0 does not match num_features:UserWarning"]  # ntrl-demo's InstanceNorm1d
