@@ -1,11 +1,12 @@
+from dataclasses import fields
 from pathlib import Path
 
 import pytest
 import torch
 
 import ntfields
-from ntfields import Problem, SceneCondition, TrainConfig
-from ntfields.data import sample_pairs
+from ntfields import Epochs, Problem, SceneCondition, TrainConfig
+from ntfields.data import PairDataset, sample_pairs
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
 from ntfields.train import Callback, LossRatioRollback, LossScaleByPrevLoss, fit
 
@@ -68,3 +69,21 @@ def test_batches_per_epoch_and_loss_scale(problem: Problem):
     assert state.epoch == 3
     assert seen[0][0] == 1.0
     assert all(scale == pytest.approx(1 / (2 * prev)) for scale, prev in seen[1:])  # 1 / Σ of 2 batch losses
+
+
+def test_micro_batches_give_the_full_batch_gradient(problem: Problem):
+    """Accumulating over parts of 40 gives the same training as whole batches of 96 (float64)."""
+    from ntfields.methods.pntfields import PNTFields, PNTFieldsConfig
+
+    pairs = sample_pairs(problem, 96)
+    data = PairDataset(*(getattr(pairs, f.name).double() for f in fields(pairs)))
+    states = []
+    for micro in (None, 40):
+        method = PNTFields(PNTFieldsConfig(hidden=16))
+        torch.manual_seed(1)
+        model = method.build_model(problem).double()
+        g = torch.Generator().manual_seed(2)
+        states.append(fit(method, model, data, SceneCondition(), Epochs(2), 96, (), g, micro_batch_size=micro))
+    assert states[0].loss == pytest.approx(states[1].loss, rel=1e-12)
+    for a, b in zip(states[0].model.parameters(), states[1].model.parameters(), strict=True):
+        torch.testing.assert_close(a, b)

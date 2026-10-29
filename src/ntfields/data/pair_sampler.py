@@ -43,13 +43,13 @@ class NearSurface:
 
         def draw(m: int) -> Tensor:
             q_s = _uniform(bounds, m, generator)
-            d = problem.env.distance(q_s)
+            d = problem.env.distance(q_s.to(device)).cpu()
             q_s = q_s[(d > self.min_clearance) & (d < self.margin)]
             direction = torch.nn.functional.normalize(torch.rand(q_s.shape, generator=generator) - 0.5, dim=-1)
             q_g = q_s + direction * max_step * torch.rand(q_s.shape[0], 1, generator=generator)
             keep = _in_bounds(bounds, q_g)
             if self.goal_min_clearance is not None:
-                keep &= problem.env.distance(q_g) > self.goal_min_clearance
+                keep &= problem.env.distance(q_g.to(device)).cpu() > self.goal_min_clearance
             return torch.cat([q_s, q_g], dim=-1)[keep]
 
         pairs = _rejection_sample(draw, n)

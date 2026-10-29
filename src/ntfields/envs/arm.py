@@ -8,6 +8,7 @@ import torch
 from torch import Tensor
 
 from ntfields.base import SceneCondition
+from ntfields.envs.mesh_distance import MeshDistance
 
 UR5E = Path(__file__).parents[1] / "resources" / "ur5e"
 UR5E_LINKS = ("shoulder_link", "upper_arm_link", "forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link")
@@ -37,7 +38,7 @@ def ntrl_random_pairs() -> tuple[Tensor, Tensor]:
 
 @dataclass
 class ArmEnv:
-    """Serial arm with collision spheres on its links, among point-cloud and sphere obstacles.
+    """Serial arm with collision spheres on its links, among point-cloud, sphere and triangle-mesh obstacles.
 
     Configurations are q = θ / joint_scale. The clearance is the smallest gap between an arm sphere and an
     obstacle, minus `clearance_offset`.
@@ -53,6 +54,7 @@ class ArmEnv:
     joint_scale: float = 2 * math.pi
     clearance_offset: float = 0.0
     chunk: int = 512  # configurations per distance chunk (memory: chunk x spheres x points)
+    mesh: MeshDistance | None = None  # unsigned distance to a triangle mesh
     _chains: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
 
     @classmethod
@@ -110,6 +112,8 @@ class ArmEnv:
         if len(self.sphere_centers):
             d = (centers[:, :, None] - self.sphere_centers.to(q)).norm(dim=-1) - self.sphere_radii.to(q)
             gaps.append(d.amin(dim=-1))
+        if self.mesh is not None:
+            gaps.append(self.mesh(centers.reshape(-1, 3)).view(centers.shape[:2]))
         return (torch.stack(gaps).amin(dim=0) - radii).amin(dim=-1)
 
     def in_bounds(self, q: Tensor) -> Tensor:

@@ -22,6 +22,7 @@ class TrainConfig:
     n_pairs: int = 10_000
     batch_size: int = 512
     batches_per_epoch: int | None = None  # None: a full pass over the data
+    micro_batch_size: int | None = None  # accumulate gradients over parts of this size (None: whole batches)
     seed: int = 0
     device: str = field(default_factory=_default_device)
     out_dir: Path | None = Path("runs")  # None disables checkpointing
@@ -62,5 +63,16 @@ def train(
         callbacks.append(Checkpoint(ckpt_path, method, problem, tc.ckpt_every))
 
     scene = problem.env.condition()
-    fit(method, model, data, scene, budget, tc.batch_size, callbacks, torch.default_generator, tc.batches_per_epoch)
+    fit(
+        method,
+        model,
+        data,
+        scene,
+        budget,
+        tc.batch_size,
+        callbacks,
+        torch.default_generator,
+        tc.batches_per_epoch,
+        tc.micro_batch_size,
+    )
     return TrainedField(method, problem, model.eval(), ckpt_path)

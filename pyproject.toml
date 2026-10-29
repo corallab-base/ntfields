@@ -41,6 +41,7 @@ extend-exclude = ["*.md"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ANN", "RUF"]
 ignore = ["ANN401"]
+allowed-confusables = ["α", "γ"]  # the papers' symbols
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN201"]

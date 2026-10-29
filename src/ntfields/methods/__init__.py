@@ -1,3 +1,3 @@
-from ntfields.methods import euclidean, td_ntfields
+from ntfields.methods import euclidean, pntfields, td_ntfields
 
-__all__ = ["euclidean", "td_ntfields"]
+__all__ = ["euclidean", "pntfields", "td_ntfields"]
