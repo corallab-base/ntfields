@@ -1,0 +1,23 @@
+# Called by tests-3.*.yml: one workflow per Python version, so each gets its own README badge.
+name: tests
+
+on:
+  workflow_call:
+    inputs:
+      python:
+        required: true
+        type: string
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ inputs.python }}
+          enable-cache: true
+      - name: Install (CPU torch)
+        run: .github/install-cpu.sh
+      # tests/fidelity and tests/private need local reference checkouts (and some CUDA); run them locally
+      - run: uv run --no-sync pytest tests/unit tests/test_end_to_end.py
