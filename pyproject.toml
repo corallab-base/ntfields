@@ -14,6 +14,19 @@ dependencies = [
 arm = ["pytorch-kinematics>=0.7"]
 cli = ["tyro>=0.9"]
 gt = ["scikit-fmm>=2024.5.29"]
+# AMD GPUs (RX 9060 XT, gfx1200): `uv sync --extra rocm`. torch and its bundled ROCm runtime come from AMD's index;
+# they are listed here so that the sources below apply to them.
+rocm = [
+    "torch[device-gfx1200]>=2.4",
+    "triton",
+    "rocm",
+    "rocm-bootstrap",
+    "rocm-sdk-core",
+    "rocm-sdk-libraries",
+    "rocm-sdk-device-gfx1200",
+    "amd-torch-device-gfx1200",
+    "amd-torch-device-gfx12-0",
+]
 
 [project.scripts]
 ntfields = "ntfields.cli:main"
@@ -32,6 +45,23 @@ dev = [
 [build-system]
 requires = ["uv_build>=0.9,<0.11"]
 build-backend = "uv_build"
+
+[[tool.uv.index]]
+name = "amd-rocm"
+url = "https://stable.repo.amd.com/rocm/whl-next/"
+explicit = true # only the packages pinned below come from here
+
+[tool.uv.sources]
+# with the rocm extra, these come from AMD; without it, torch and triton come from PyPI as before
+torch = { index = "amd-rocm", extra = "rocm" }
+triton = { index = "amd-rocm", extra = "rocm" }
+rocm = { index = "amd-rocm", extra = "rocm" }
+rocm-bootstrap = { index = "amd-rocm", extra = "rocm" }
+rocm-sdk-core = { index = "amd-rocm", extra = "rocm" }
+rocm-sdk-libraries = { index = "amd-rocm", extra = "rocm" }
+rocm-sdk-device-gfx1200 = { index = "amd-rocm", extra = "rocm" }
+amd-torch-device-gfx1200 = { index = "amd-rocm", extra = "rocm" }
+amd-torch-device-gfx12-0 = { index = "amd-rocm", extra = "rocm" }
 
 [tool.ruff]
 line-length = 120
