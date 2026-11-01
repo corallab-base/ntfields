@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -38,9 +39,11 @@ def train(
     train_cfg: TrainConfig | None = None,
     sampler: Sampler | None = None,
     data: PairDataset | None = None,
+    callbacks: Sequence[Callback] = (),
 ) -> TrainedField:
     """Train `method` (a registered name or preset, or an instance) on `problem`; `sampler` overrides the
-    method's default pair sampler, and `data` (pre-built pairs) replaces sampling."""
+    method's default pair sampler, `data` (pre-built pairs) replaces sampling, and `callbacks` run after the
+    method's own."""
     if isinstance(method, str):
         method = create(method, cfg)
     elif cfg is not None:
@@ -56,11 +59,11 @@ def train(
     torch.manual_seed(tc.seed)
     data = data[torch.randperm(len(data))].to(tc.device)
     model = method.build_model(problem).to(tc.device)
-    callbacks: list[Callback] = [*method.callbacks(), Logger(tc.log_every)]
+    run_callbacks: list[Callback] = [*method.callbacks(), *callbacks, Logger(tc.log_every)]
     ckpt_path = None
     if tc.out_dir is not None:
         ckpt_path = tc.out_dir / method.name / datetime.now().strftime("%Y%m%d-%H%M%S") / "ckpt.pt"
-        callbacks.append(Checkpoint(ckpt_path, method, problem, tc.ckpt_every))
+        run_callbacks.append(Checkpoint(ckpt_path, method, problem, tc.ckpt_every))
 
     scene = problem.env.condition()
     fit(
@@ -70,7 +73,7 @@ def train(
         scene,
         budget,
         tc.batch_size,
-        callbacks,
+        run_callbacks,
         torch.default_generator,
         tc.batches_per_epoch,
         tc.micro_batch_size,

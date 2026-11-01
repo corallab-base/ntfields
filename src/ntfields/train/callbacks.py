@@ -47,14 +47,22 @@ class LossRatioRollback(Callback):
         self._current = snapshot
 
     def on_epoch_end(self, state: TrainState) -> None:
-        ratio = state.loss / self.prev_loss
-        if not 0 < ratio < self.threshold:
+        ratio = state.loss / self.prev_loss if self.prev_loss else math.inf
+        if state.loss != 0 and not 0 < ratio < self.threshold:  # an exactly zero loss is never a divergence
             self.retries += 1
             if self.retries < self.max_retries:
                 snapshot = self._rng.choice(self.queue)
                 state.model.load_state_dict(snapshot["model"])
                 state.optimizer.load_state_dict(snapshot["optim"])
                 state.retry = True
+                return
+            if not math.isfinite(state.loss):  # never accept a diverged model: stop at the last accepted state
+                log.warning("epoch %d: %d rollbacks, loss %s; stopping training", state.epoch, self.retries, state.loss)
+                assert self._current is not None
+                state.model.load_state_dict(self._current["model"])
+                state.optimizer.load_state_dict(self._current["optim"])
+                state.loss = self.prev_loss
+                state.retry = state.stop = True
                 return
             log.warning("epoch %d: %d rollbacks, accepting loss ratio %.3f", state.epoch, self.retries, ratio)
         self.prev_loss = state.loss
@@ -69,7 +77,7 @@ class LossScaleByPrevLoss(Callback):
         self.numerator = numerator
 
     def on_epoch_start(self, state: TrainState) -> None:
-        if not math.isnan(state.prev_loss):  # at least one accepted epoch
+        if not math.isnan(state.prev_loss) and state.prev_loss > 0:  # an accepted epoch with a nonzero loss
             state.loss_scale = self.numerator / (state.batches * state.prev_loss)
 
 

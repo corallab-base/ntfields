@@ -87,3 +87,38 @@ def test_micro_batches_give_the_full_batch_gradient(problem: Problem):
     assert states[0].loss == pytest.approx(states[1].loss, rel=1e-12)
     for a, b in zip(states[0].model.parameters(), states[1].model.parameters(), strict=True):
         torch.testing.assert_close(a, b)
+
+
+def test_zero_loss_is_accepted_and_keeps_the_loss_scale():
+    model = Euclidean(EuclideanConfig()).build_model(None)  # pyright: ignore[reportArgumentType]
+    state = ntfields.TrainState(model, torch.optim.SGD(model.parameters(), lr=0.1), loss=0.5, batches=2)
+    rollback, scale = LossRatioRollback(1.2), LossScaleByPrevLoss(4.0)
+    for loss in (0.5, 0.0, 0.0):  # a perfect fit, e.g. constant speed in an empty scene
+        rollback.on_epoch_start(state)
+        state.loss = loss
+        rollback.on_epoch_end(state)
+        assert not state.retry
+        state.prev_loss = state.loss
+        scale.on_epoch_start(state)
+        assert state.loss_scale == pytest.approx(4.0)  # still from the last nonzero epoch: 4 / (2 · 0.5)
+
+
+def test_diverged_loss_stops_at_the_last_accepted_state():
+    model = Euclidean(EuclideanConfig()).build_model(None)  # pyright: ignore[reportArgumentType]
+    state = ntfields.TrainState(model, torch.optim.SGD(model.parameters(), lr=0.1))
+    rollback = LossRatioRollback(1.2, max_retries=3)
+    rollback.on_epoch_start(state)
+    state.loss = 0.5
+    rollback.on_epoch_end(state)
+    good = {k: v.clone() for k, v in model.state_dict().items()}
+    rollback.on_epoch_start(state)
+    for _ in range(3):  # every retry diverges
+        with torch.no_grad():
+            for p in model.parameters():
+                p.fill_(float("nan"))
+        state.loss, state.retry = float("nan"), False
+        rollback.on_epoch_end(state)
+        rollback.on_epoch_start(state)
+    assert state.stop and state.retry and state.loss == 0.5
+    for k, v in model.state_dict().items():
+        torch.testing.assert_close(v, good[k])

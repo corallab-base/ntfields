@@ -1,0 +1,84 @@
+{
+  "format_version": 1,
+  "name": "box2d",
+  "version": 1,
+  "description": "2D point mass in [-1, 1]^2: empty, one sphere, clutter, walls, thick walls",
+  "leaderboard": true,
+  "min_seeds": 3,
+  "protocol": {
+    "margin": 0.01,
+    "resolution": 0.005,
+    "endpoint_tol": 0.0001,
+    "reference_tol": 0.02
+  },
+  "reference": {
+    "kind": "fmm",
+    "resolution": 401,
+    "seed": 0,
+    "min_distance": 0.5
+  },
+  "problems": [
+    {
+      "name": "empty",
+      "scene": "scenes/empty.json",
+      "queries": "queries/empty.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.01,
+        "dmax": 0.1
+      }
+    },
+    {
+      "name": "one_sphere",
+      "scene": "scenes/one_sphere.json",
+      "queries": "queries/one_sphere.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.01,
+        "dmax": 0.1
+      }
+    },
+    {
+      "name": "clutter",
+      "scene": "scenes/clutter.json",
+      "queries": "queries/clutter.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.01,
+        "dmax": 0.1
+      }
+    },
+    {
+      "name": "walls",
+      "scene": "scenes/walls.json",
+      "queries": "queries/walls.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.01,
+        "dmax": 0.1
+      }
+    },
+    {
+      "name": "thick_walls",
+      "scene": "scenes/thick_walls.json",
+      "queries": "queries/thick_walls.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.01,
+        "dmax": 0.1
+      }
+    }
+  ],
+  "files": {
+    "scenes/empty.json": "b9ea29e967307b292af4a698544636f184ded50c075855f153eba17037f033da",
+    "queries/empty.json": "6508194689ce2daf1b69007c607243e6c642ab00bf4a45d3e2dfb8ee2c8c154b",
+    "scenes/one_sphere.json": "0484066d73d489ed8f157081ec584fe508235678c2c1a05d5eb615b4cf9b14eb",
+    "queries/one_sphere.json": "8fd8b4a5ba66174c9c1ebe678398bd1033b1f200e18ae9b282fd10d5dc7e2650",
+    "scenes/clutter.json": "e48e7a8d3af065ef8f07d9ca7fe443e38f94994c540323f2325e8b6c8b974e33",
+    "queries/clutter.json": "3c6dd5bbff101d375709cab1e6170f0dd6b5430c6956627b1d6cde4c8fadb826",
+    "scenes/walls.json": "11dd6c0b98d98e0ab6c8b062698db158a93b628b5d85664acef00cf8fa392df4",
+    "queries/walls.json": "7418aa5f28d4038c759d9ae7bd70d2509259fe42fb45fe108dc955112f96db09",
+    "scenes/thick_walls.json": "88e7e510f1ece7f097a7930e8873873b7afc8022d15920ca34851d59c7c7c4f9",
+    "queries/thick_walls.json": "ca20d8bfd343ed4ddafbcdcffb9c205da717c383d4e76a9c9ec50a5123724c16"
+  }
+}

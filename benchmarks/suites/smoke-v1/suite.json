@@ -1,0 +1,36 @@
+{
+  "format_version": 1,
+  "name": "smoke",
+  "version": 1,
+  "description": "CI smoke test: one sphere, 4 queries per split",
+  "leaderboard": false,
+  "min_seeds": 1,
+  "protocol": {
+    "margin": 0.01,
+    "resolution": 0.005,
+    "endpoint_tol": 0.0001,
+    "reference_tol": 0.02
+  },
+  "reference": {
+    "kind": "fmm",
+    "resolution": 401,
+    "seed": 0,
+    "min_distance": 0.5
+  },
+  "problems": [
+    {
+      "name": "one_sphere",
+      "scene": "scenes/one_sphere.json",
+      "queries": "queries/one_sphere.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.01,
+        "dmax": 0.1
+      }
+    }
+  ],
+  "files": {
+    "scenes/one_sphere.json": "0484066d73d489ed8f157081ec584fe508235678c2c1a05d5eb615b4cf9b14eb",
+    "queries/one_sphere.json": "953a9534a6d868566c78ccd82c7b5ed64e22905fec97e377291205004d503eef"
+  }
+}

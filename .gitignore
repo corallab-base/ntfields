@@ -9,3 +9,5 @@ runs/
 docs/
 CLAUDE.md
 tests/private/
+benchmarks/checkpoints/
+/results/

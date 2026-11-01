@@ -4,6 +4,8 @@ import torch
 
 from ntfields import Problem, SceneCondition
 from ntfields.data import NearSurface, PairDataset, SurfaceMix, sample_pairs
+from ntfields.envs import load_env
+from ntfields.speed import Clipped
 
 
 def test_samples_are_valid_and_deterministic(problem: Problem):
@@ -41,3 +43,12 @@ def test_surface_mix_pairs(problem: Problem):
     surface = data.q_s[200:], data.q_g[200:]
     near = torch.minimum(problem.env.distance(surface[0]), problem.env.distance(surface[1])) < 0.2
     assert near.all() and ((surface[0] - surface[1]).abs() <= 0.5 + 1e-6).all()
+
+
+def test_surface_samplers_without_obstacles_sample_uniformly():
+    problem = Problem(load_env("box2d/empty"), Clipped(0.01, 0.1))
+    q_s, q_g = NearSurface(margin=0.05, max_step=0.5).sample(problem, 200, torch.Generator().manual_seed(0))
+    assert q_s.shape == (200, 2) and ((q_g - q_s).norm(dim=-1) <= 0.5 + 1e-6).all()
+    for anchor in ("project", "reject"):
+        q_s, q_g = SurfaceMix(anchor=anchor).sample(problem, 200, torch.Generator().manual_seed(0))
+        assert q_s.shape == (200, 2) and torch.isfinite(torch.cat([q_s, q_g])).all()

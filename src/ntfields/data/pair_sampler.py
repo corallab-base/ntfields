@@ -28,7 +28,8 @@ class Uniform:
 @dataclass
 class NearSurface:
     """TD-NTFields: starts with min_clearance < d < margin (margin should match the speed's dmax), goals a uniform
-    distance up to `max_step` away in a random direction, inside the bounds."""
+    distance up to `max_step` away in a random direction, inside the bounds. In a scene without obstacles (d = inf
+    everywhere) there is no surface, so starts are uniform."""
 
     margin: float = 0.1
     min_clearance: float = 0.0
@@ -44,7 +45,7 @@ class NearSurface:
         def draw(m: int) -> Tensor:
             q_s = _uniform(bounds, m, generator)
             d = problem.env.distance(q_s.to(device)).cpu()
-            q_s = q_s[(d > self.min_clearance) & (d < self.margin)]
+            q_s = q_s[(d > self.min_clearance) & ((d < self.margin) | d.isinf())]
             direction = torch.nn.functional.normalize(torch.rand(q_s.shape, generator=generator) - 0.5, dim=-1)
             q_g = q_s + direction * max_step * torch.rand(q_s.shape[0], 1, generator=generator)
             keep = _in_bounds(bounds, q_g)
@@ -64,7 +65,8 @@ class SurfaceMix:
 
     Surface ends come from `anchor`: "project" moves free points along the clearance gradient to a clearance
     uniform in (0, shell) (needs clearance in configuration units, e.g. a
-    point mass); "reject" keeps uniform configurations with 0 < d < shell, as its arm sampler does.
+    point mass); "reject" keeps uniform configurations with 0 < d < shell, as its arm sampler does. In a scene without
+    obstacles (d = inf everywhere) there is no surface, so anchors are uniform free points.
     """
 
     surface_fraction: float = 0.5
@@ -83,12 +85,13 @@ class SurfaceMix:
                 q = sample_valid(problem, m, generator)
                 _, normal = problem.speed_and_normal(q)
                 target = self.shell * torch.rand(m, 1, generator=generator)
-                a = q - (problem.env.distance(q)[:, None] - target) * normal
+                d = problem.env.distance(q)[:, None]
+                a = torch.where(d.isinf(), q, q - (d - target) * normal)
                 a = a[problem.env.is_valid(a)]
             else:
                 a = _uniform(bounds, m, generator)
                 d = problem.env.distance(a)
-                a = a[(d > 0) & (d < self.shell)]
+                a = a[(d > 0) & ((d < self.shell) | d.isinf())]
             b = (a + self.perturb * (2 * torch.rand(a.shape, generator=generator) - 1)).clamp(
                 bounds[:, 0], bounds[:, 1]
             )

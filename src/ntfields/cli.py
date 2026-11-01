@@ -1,4 +1,5 @@
 import logging
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Generic, Literal, TypeVar, Union
@@ -42,6 +43,11 @@ class Train(Generic[C]):
 
 
 def main(args: Sequence[str] | None = None) -> None:
+    argv = list(sys.argv[1:] if args is None else args)
+    if argv[:1] == ["bench"]:
+        from ntfields.bench.cli import main as bench
+
+        return bench(argv[1:])
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     names = available()
     defaults = {name: default_config(name) for name in names}
@@ -52,7 +58,10 @@ def main(args: Sequence[str] | None = None) -> None:
         )
     ]
     command: Train[Any] = tyro.extras.subcommand_cli_from_dict(
-        {"train": Train[choice]}, args=args, config=(tyro.conf.CascadeSubcommandArgs,)
+        {"train": Train[choice]},
+        args=argv,
+        config=(tyro.conf.CascadeSubcommandArgs,),
+        description="Train methods; see `ntfields bench --help` for the benchmark.",
     )
     name = next(n for n, cfg in defaults.items() if type(cfg) is type(command.method))
     method = get_method(name)(command.method)

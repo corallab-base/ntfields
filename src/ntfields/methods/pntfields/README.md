@@ -58,7 +58,7 @@ are its defaults (β 0.03, d_g 0.06). For the arm, the reference uses
 | epoch loss | Σ₆ batch losses / `len(loader)` (logged, used for β and the rollback ratio) | mean over batches (logged); `loss_scale_numerator` reproduces β | logged values are `len(loader)/6` × the reference's |
 | first rollback check | previous loss starts at 1.0, in Σ₆/`len(loader)` units | starts at 1000, in mean units | none in practice: both accept any sane first epoch |
 | rollback queue | `randint(0, 4)`, which fails while fewer than 5 states are queued | draws from the states queued so far | the reference crashes where ntfields rolls back |
-| rollback retries | unlimited | `LossRatioRollback(max_retries=200)`, then the epoch is accepted with a warning | none unless training is stuck |
+| rollback retries | unlimited | `LossRatioRollback(max_retries=200)`, then the epoch is accepted with a warning; a non-finite loss is never accepted, and training stops at the last accepted state | none unless training is stuck, where the reference never ends |
 | lr on a retried epoch | restored from the rolled-back optimizer state (the previous epoch's lr) | the ramp's lr for this epoch | at most 5e-7 apart, only in epochs 8000–8500 |
 | shuffling | the loader re-permutes its already-permuted tensors | a fresh permutation each epoch | statistically the same |
 | operation order | `x @ (2πB)`; start and goal stacked through one encoder call | `2π·(x Bᵀ)`; separate encoder calls | rounding only |

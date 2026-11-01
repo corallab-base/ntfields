@@ -6,7 +6,7 @@ import torch
 from torch import Tensor
 
 from ntfields.base import Method, TravelTimeModel
-from ntfields.plan import PLANNERS, PlanResult
+from ntfields.plan import PlanResult, get_planner
 from ntfields.problem import Problem
 
 
@@ -32,4 +32,4 @@ class TrainedField:
 
     def plan(self, start: Tensor, goal: Tensor, planner: str | None = None) -> PlanResult:
         """Single query with `planner` (default: the method's default planner)."""
-        return PLANNERS[planner or self.method.default_planner](self, start, goal)
+        return get_planner(planner or self.method.default_planner)(self, start, goal)
