@@ -75,6 +75,15 @@ class TravelTimeModel(nn.Module, ABC):
     @abstractmethod
     def forward(self, q_s: Tensor, q_g: Tensor, scene: SceneCondition) -> Tensor: ...  # (B,)
 
+    def encode_goal(self, q_g: Tensor, scene: SceneCondition) -> Tensor:
+        """What T(·, q_g) needs from one goal q_g (dim,), computed once (a (1, n) row); by default q_g itself.
+        Models override it, with `travel_time_from_encoded_goal`, to skip the goal's share of every query."""
+        return q_g[None]
+
+    def travel_time_from_encoded_goal(self, q: Tensor, e_g: Tensor, scene: SceneCondition) -> Tensor:
+        """T(q, q_g) (B,) for a batch q (B, dim) and e_g = encode_goal(q_g)."""
+        return self(q, e_g.expand(q.shape[0], -1), scene)
+
 
 @dataclass
 class MethodConfig:
