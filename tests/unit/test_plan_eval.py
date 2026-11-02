@@ -6,6 +6,7 @@ from ntfields.eval import is_collision_free, path_cost, path_length, travel_time
 from ntfields.gt import fmm_travel_time
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
 from ntfields.plan import mppi
+from ntfields.registry import create
 from ntfields.speed import Clipped
 
 
@@ -47,6 +48,20 @@ def test_planner_meets_in_free_space():
     assert result.success
     assert torch.equal(result.path[0], start) and torch.equal(result.path[-1], goal)
     assert path_length(result.path) < 1.01 * float((goal - start).norm()) + 0.06
+
+
+def test_towards_matches_pair_queries():
+    """In float64: in float32, embedding the goal alone rather than in a batch changes the rounding."""
+    torch.manual_seed(0)
+    problem = _empty()
+    for name in ("euclidean", "td_ntfields", "pntfields"):
+        method = create(name)
+        field = TrainedField(method, problem, method.build_model(problem).double().eval())
+        q = torch.rand(16, 2, dtype=torch.float64) - 0.5
+        goal = torch.tensor([0.3, -0.2], dtype=torch.float64)
+        target = field.towards(goal)
+        torch.testing.assert_close(target.travel_time(q), field.travel_time(q, goal.expand_as(q)), msg=name)
+        torch.testing.assert_close(target.gradient(q), field.gradient(q, goal.expand_as(q))[0], msg=name)
 
 
 def test_mppi_reaches_goal_in_free_space():

@@ -31,6 +31,7 @@ def mppi(
     first step.
     """
     dim = start.shape[-1]
+    target = field.towards(goal)
     q, prior = start.clone(), torch.zeros_like(start)
     path, reached = [start], False
     for _ in range(max_steps):
@@ -39,7 +40,7 @@ def mppi(
         steps = noise + prior_gain * prior
         steps = steps / (steps.norm(dim=2, keepdim=True).clamp(min=step) / step)
         ends = (q + steps.cumsum(dim=1))[:, [0, -1]].reshape(-1, dim)
-        cost = field.travel_time(ends, goal.expand_as(ends)).reshape(samples, 2)
+        cost = target.travel_time(ends).reshape(samples, 2)
         weight = torch.softmax(-temperature * (first_weight * cost[:, 0] + cost[:, 1]), dim=0)
         prior = weight @ steps[:, 0]
         q = q + prior

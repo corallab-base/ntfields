@@ -94,7 +94,11 @@ class PNTFieldsModel(TravelTimeModel):
 
     def tau(self, q_s: Tensor, q_g: Tensor) -> Tensor:
         """τ (B,), the factor with T = ‖q_g - q_s‖ / τ."""
-        f = torch.stack([self.encode(q_s), self.encode(q_g)])
+        return self.tau_from_encodings(self.encode(q_s), self.encode(q_g))
+
+    def tau_from_encodings(self, f_s: Tensor, f_g: Tensor) -> Tensor:
+        """τ from the encodings f_s (B, hidden) and f_g (B or 1, hidden)."""
+        f = torch.stack(torch.broadcast_tensors(f_s, f_g))
         x = torch.cat([torch.logsumexp(self.beta * f, 0), -torch.logsumexp(-self.beta * f, 0)], dim=-1) / self.beta
         for block in self.generator_blocks:
             x = block(x)
@@ -103,6 +107,14 @@ class PNTFieldsModel(TravelTimeModel):
 
     def forward(self, q_s: Tensor, q_g: Tensor, scene: SceneCondition) -> Tensor:
         return (q_g - q_s).norm(dim=-1) / self.tau(q_s, q_g)
+
+    def encode_goal(self, q_g: Tensor, scene: SceneCondition) -> Tensor:
+        """[q_g, f(q_g)] (1, dim + hidden): the numerator needs the goal itself."""
+        return torch.cat([q_g[None], self.encode(q_g[None])], dim=-1)
+
+    def travel_time_from_encoded_goal(self, q: Tensor, e_g: Tensor, scene: SceneCondition) -> Tensor:
+        q_g, f_g = e_g[:, : q.shape[-1]], e_g[:, q.shape[-1] :]
+        return (q_g - q).norm(dim=-1) / self.tau_from_encodings(self.encode(q), f_g)
 
     def tau_jet(self, q_s: Tensor, q_g: Tensor) -> Jet:
         """τ (B,), and its gradient and Hessian diagonal (B, 2·dim) w.r.t. [q_s, q_g]."""

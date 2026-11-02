@@ -1,6 +1,8 @@
 from dataclasses import asdict
 from typing import Any
 
+import torch
+
 from ntfields.base import Method, TrainState
 from ntfields.checkpoint import config_from_dict
 from ntfields.data import sample_pairs
@@ -24,6 +26,13 @@ def check_method(method_cls: type[Method[Any]], problem: Problem | None = None) 
     assert t.shape == (64,), f"travel time must have shape (B,), got {tuple(t.shape)}"
     t_self = model(batch.q_s, batch.q_s, batch.scene)
     assert t_self.abs().max() < 1e-2 * t.abs().mean() + 1e-6, "T(q, q) must be ~0"
+    q_g = batch.q_g[0]
+    t_goal = model.travel_time_from_encoded_goal(batch.q_s, model.encode_goal(q_g, batch.scene), batch.scene)
+    torch.testing.assert_close(
+        t_goal,
+        model(batch.q_s, q_g.expand_as(batch.q_s), batch.scene),
+        msg="travel_time_from_encoded_goal must match forward",
+    )
 
     out = method.loss(model, batch, TrainState(model=model, optimizer=method.optimizer(model)))
     assert out.total.ndim == 0 and out.total.isfinite(), "loss must be a finite scalar"

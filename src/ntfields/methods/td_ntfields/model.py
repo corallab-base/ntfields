@@ -82,8 +82,17 @@ class TDMetricModel(TravelTimeModel):
         return F.instance_norm(self.final(x)[None])[0]
 
     def forward(self, q_s: Tensor, q_g: Tensor, scene: SceneCondition) -> Tensor:
-        e_s, e_g = self.embed(q_s), self.embed(q_g)
-        d = ((e_s - e_g) ** 2 + 1e-6).sqrt().view(q_s.shape[0], -1, self.group)
+        return self.travel_time_from_embeddings(self.embed(q_s), self.embed(q_g))
+
+    def encode_goal(self, q_g: Tensor, scene: SceneCondition) -> Tensor:
+        return self.embed(q_g[None])
+
+    def travel_time_from_encoded_goal(self, q: Tensor, e_g: Tensor, scene: SceneCondition) -> Tensor:
+        return self.travel_time_from_embeddings(self.embed(q), e_g)
+
+    def travel_time_from_embeddings(self, e_s: Tensor, e_g: Tensor) -> Tensor:
+        """T from the embeddings e_s (B, hidden) and e_g (B or 1, hidden)."""
+        d = ((e_s - e_g) ** 2 + 1e-6).sqrt().view(e_s.shape[0], -1, self.group)
         t = self.temperature
         smooth_max = (torch.logsumexp(t * d, dim=-1) - math.log(self.group)) / t
         return self.out_scale * smooth_max.sum(dim=-1)
