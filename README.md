@@ -55,6 +55,9 @@ print(travel_time_error(field, gt, sample_valid(problem, 500).to(device)))
 field = ntfields.load(field.ckpt_path, device=device)  # reload later from the checkpoint
 ```
 
+For many queries against one goal, `field.towards(goal)` encodes the goal once and gives `.travel_time(q)` and
+`.gradient(q)` for batches q; MPPI plans this way.
+
 The same run from the CLI (needs the `[cli]` extra). `--method.*` sets any field of the method's config:
 
 ```bash
