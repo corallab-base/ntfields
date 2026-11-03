@@ -37,6 +37,7 @@ def fold(model: TDMetricModel) -> InferenceModel:
         pair_travel_time=PairTravelTime(embed, model),
         gradient=GoalTravelTimeGrad(embed, model),
         pair_gradient=PairTravelTimeGrad(embed, model),
+        float16_weights=True,
     )
 
 

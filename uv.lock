@@ -301,6 +301,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dllist"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/ce/dda13123329d55555de67b414206f14f4f80b96cb273ec59d76d5ce6b5c3/dllist-2.0.0.tar.gz", hash = "sha256:7413ba963aaa1b2b6827eadd7908e40e635b19108ab431667485eaf75c492bf4", size = 5369, upload-time = "2025-02-10T15:41:07.637Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/07/a212ca4cfe56fa35c8315307e37df218e5946c726a792b5c7a795b245c10/dllist-2.0.0-py3-none-any.whl", hash = "sha256:cd307b1a91bc46fae084f8c817d79be7e34951b149a2fd69004772e03573bfb3", size = 5721, upload-time = "2025-02-10T15:41:06.045Z" },
+]
+
+[[package]]
 name = "docstring-parser"
 version = "0.18.0"
 source = { registry = "https://pypi.org/simple" }
@@ -998,6 +1007,9 @@ cli = [
 gt = [
     { name = "scikit-fmm" },
 ]
+tensorrt = [
+    { name = "torch-tensorrt", marker = "python_full_version >= '3.12'" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1007,6 +1019,7 @@ dev = [
     { name = "pytorch-kinematics" },
     { name = "ruff" },
     { name = "scikit-fmm" },
+    { name = "torch-tensorrt", marker = "python_full_version >= '3.12'" },
     { name = "tyro" },
 ]
 
@@ -1017,9 +1030,10 @@ requires-dist = [
     { name = "pytorch-kinematics", marker = "extra == 'arm'", specifier = ">=0.7" },
     { name = "scikit-fmm", marker = "extra == 'gt'", specifier = ">=2024.5.29" },
     { name = "torch", specifier = ">=2.4" },
+    { name = "torch-tensorrt", marker = "python_full_version >= '3.12' and extra == 'tensorrt'", specifier = ">=2.14,<2.15" },
     { name = "tyro", marker = "extra == 'cli'", specifier = ">=0.9" },
 ]
-provides-extras = ["arm", "cli", "gt"]
+provides-extras = ["arm", "cli", "gt", "tensorrt"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1029,6 +1043,7 @@ dev = [
     { name = "pytorch-kinematics", specifier = ">=0.7" },
     { name = "ruff", specifier = ">=0.14" },
     { name = "scikit-fmm", specifier = ">=2024.5.29" },
+    { name = "torch-tensorrt", marker = "python_full_version >= '3.12'", specifier = ">=2.14,<2.15" },
     { name = "tyro", specifier = ">=0.9" },
 ]
 
@@ -1451,6 +1466,34 @@ wheels = [
 ]
 
 [[package]]
+name = "psutil"
+version = "7.2.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/c6/d1ddf4abb55e93cebc4f2ed8b5d6dbad109ecb8d63748dd2b20ab5e57ebe/psutil-7.2.2.tar.gz", hash = "sha256:0746f5f8d406af344fd547f1c8daa5f5c33dbc293bb8d6a16d80b4bb88f59372", size = 493740, upload-time = "2026-01-28T18:14:54.428Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/08/510cbdb69c25a96f4ae523f733cdc963ae654904e8db864c07585ef99875/psutil-7.2.2-cp313-cp313t-macosx_10_13_x86_64.whl", hash = "sha256:2edccc433cbfa046b980b0df0171cd25bcaeb3a68fe9022db0979e7aa74a826b", size = 130595, upload-time = "2026-01-28T18:14:57.293Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/f5/97baea3fe7a5a9af7436301f85490905379b1c6f2dd51fe3ecf24b4c5fbf/psutil-7.2.2-cp313-cp313t-macosx_11_0_arm64.whl", hash = "sha256:e78c8603dcd9a04c7364f1a3e670cea95d51ee865e4efb3556a3a63adef958ea", size = 131082, upload-time = "2026-01-28T18:14:59.732Z" },
+    { url = "https://files.pythonhosted.org/packages/37/d6/246513fbf9fa174af531f28412297dd05241d97a75911ac8febefa1a53c6/psutil-7.2.2-cp313-cp313t-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1a571f2330c966c62aeda00dd24620425d4b0cc86881c89861fbc04549e5dc63", size = 181476, upload-time = "2026-01-28T18:15:01.884Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/b5/9182c9af3836cca61696dabe4fd1304e17bc56cb62f17439e1154f225dd3/psutil-7.2.2-cp313-cp313t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:917e891983ca3c1887b4ef36447b1e0873e70c933afc831c6b6da078ba474312", size = 184062, upload-time = "2026-01-28T18:15:04.436Z" },
+    { url = "https://files.pythonhosted.org/packages/16/ba/0756dca669f5a9300d0cbcbfae9a4c30e446dfc7440ffe43ded5724bfd93/psutil-7.2.2-cp313-cp313t-win_amd64.whl", hash = "sha256:ab486563df44c17f5173621c7b198955bd6b613fb87c71c161f827d3fb149a9b", size = 139893, upload-time = "2026-01-28T18:15:06.378Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/61/8fa0e26f33623b49949346de05ec1ddaad02ed8ba64af45f40a147dbfa97/psutil-7.2.2-cp313-cp313t-win_arm64.whl", hash = "sha256:ae0aefdd8796a7737eccea863f80f81e468a1e4cf14d926bd9b6f5f2d5f90ca9", size = 135589, upload-time = "2026-01-28T18:15:08.03Z" },
+    { url = "https://files.pythonhosted.org/packages/81/69/ef179ab5ca24f32acc1dac0c247fd6a13b501fd5534dbae0e05a1c48b66d/psutil-7.2.2-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:eed63d3b4d62449571547b60578c5b2c4bcccc5387148db46e0c2313dad0ee00", size = 130664, upload-time = "2026-01-28T18:15:09.469Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/64/665248b557a236d3fa9efc378d60d95ef56dd0a490c2cd37dafc7660d4a9/psutil-7.2.2-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:7b6d09433a10592ce39b13d7be5a54fbac1d1228ed29abc880fb23df7cb694c9", size = 131087, upload-time = "2026-01-28T18:15:11.724Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/2e/e6782744700d6759ebce3043dcfa661fb61e2fb752b91cdeae9af12c2178/psutil-7.2.2-cp314-cp314t-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1fa4ecf83bcdf6e6c8f4449aff98eefb5d0604bf88cb883d7da3d8d2d909546a", size = 182383, upload-time = "2026-01-28T18:15:13.445Z" },
+    { url = "https://files.pythonhosted.org/packages/57/49/0a41cefd10cb7505cdc04dab3eacf24c0c2cb158a998b8c7b1d27ee2c1f5/psutil-7.2.2-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:e452c464a02e7dc7822a05d25db4cde564444a67e58539a00f929c51eddda0cf", size = 185210, upload-time = "2026-01-28T18:15:16.002Z" },
+    { url = "https://files.pythonhosted.org/packages/dd/2c/ff9bfb544f283ba5f83ba725a3c5fec6d6b10b8f27ac1dc641c473dc390d/psutil-7.2.2-cp314-cp314t-win_amd64.whl", hash = "sha256:c7663d4e37f13e884d13994247449e9f8f574bc4655d509c3b95e9ec9e2b9dc1", size = 141228, upload-time = "2026-01-28T18:15:18.385Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/fc/f8d9c31db14fcec13748d373e668bc3bed94d9077dbc17fb0eebc073233c/psutil-7.2.2-cp314-cp314t-win_arm64.whl", hash = "sha256:11fe5a4f613759764e79c65cf11ebdf26e33d6dd34336f8a337aa2996d71c841", size = 136284, upload-time = "2026-01-28T18:15:19.912Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/36/5ee6e05c9bd427237b11b3937ad82bb8ad2752d72c6969314590dd0c2f6e/psutil-7.2.2-cp36-abi3-macosx_10_9_x86_64.whl", hash = "sha256:ed0cace939114f62738d808fdcecd4c869222507e266e574799e9c0faa17d486", size = 129090, upload-time = "2026-01-28T18:15:22.168Z" },
+    { url = "https://files.pythonhosted.org/packages/80/c4/f5af4c1ca8c1eeb2e92ccca14ce8effdeec651d5ab6053c589b074eda6e1/psutil-7.2.2-cp36-abi3-macosx_11_0_arm64.whl", hash = "sha256:1a7b04c10f32cc88ab39cbf606e117fd74721c831c98a27dc04578deb0c16979", size = 129859, upload-time = "2026-01-28T18:15:23.795Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/70/5d8df3b09e25bce090399cf48e452d25c935ab72dad19406c77f4e828045/psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:076a2d2f923fd4821644f5ba89f059523da90dc9014e85f8e45a5774ca5bc6f9", size = 155560, upload-time = "2026-01-28T18:15:25.976Z" },
+    { url = "https://files.pythonhosted.org/packages/63/65/37648c0c158dc222aba51c089eb3bdfa238e621674dc42d48706e639204f/psutil-7.2.2-cp36-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b0726cecd84f9474419d67252add4ac0cd9811b04d61123054b9fb6f57df6e9e", size = 156997, upload-time = "2026-01-28T18:15:27.794Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/13/125093eadae863ce03c6ffdbae9929430d116a246ef69866dad94da3bfbc/psutil-7.2.2-cp36-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:fd04ef36b4a6d599bbdb225dd1d3f51e00105f6d48a28f006da7f9822f2606d8", size = 148972, upload-time = "2026-01-28T18:15:29.342Z" },
+    { url = "https://files.pythonhosted.org/packages/04/78/0acd37ca84ce3ddffaa92ef0f571e073faa6d8ff1f0559ab1272188ea2be/psutil-7.2.2-cp36-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:b58fabe35e80b264a4e3bb23e6b96f9e45a3df7fb7eed419ac0e5947c61e47cc", size = 148266, upload-time = "2026-01-28T18:15:31.597Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/90/e2159492b5426be0c1fef7acba807a03511f97c5f86b3caeda6ad92351a7/psutil-7.2.2-cp37-abi3-win_amd64.whl", hash = "sha256:eb7e81434c8d223ec4a219b5fc1c47d0417b12be7ea866e24fb5ad6e84b3d988", size = 137737, upload-time = "2026-01-28T18:15:33.849Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/c7/7bb2e321574b10df20cbde462a94e2b71d05f9bbda251ef27d104668306a/psutil-7.2.2-cp37-abi3-win_arm64.whl", hash = "sha256:8c233660f575a5a89e6d4cb65d9f938126312bca76d8fe087b947b3a1aaac9ee", size = 134617, upload-time = "2026-01-28T18:15:36.514Z" },
+]
+
+[[package]]
 name = "pygments"
 version = "2.21.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1814,6 +1857,50 @@ wheels = [
 ]
 
 [[package]]
+name = "tensorrt"
+version = "11.1.0.106"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tensorrt-cu13", marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/af/215ec5632aa002fcc061b18f9e16f718a5e3d51d04712713f0a154e2ba07/tensorrt-11.1.0.106.tar.gz", hash = "sha256:18ee99dc9cb0b2c14d12a68e1a062a79699c05a684ae564390130a1293af059a", size = 16664, upload-time = "2026-06-16T17:26:20.666Z" }
+
+[[package]]
+name = "tensorrt-cu13"
+version = "11.1.0.106"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tensorrt-cu13-bindings", marker = "python_full_version >= '3.12'" },
+    { name = "tensorrt-cu13-libs", marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/27/85/b71d95375f67b3b54450aa1b313d099e69987aaf669f47313abe2da49d5d/tensorrt_cu13-11.1.0.106.tar.gz", hash = "sha256:7511c9fa102306c5841a3a261a18a99eab3a5e4bf2e1f64a34f3331475f8e804", size = 17979, upload-time = "2026-06-16T17:26:20.17Z" }
+
+[[package]]
+name = "tensorrt-cu13-bindings"
+version = "11.1.0.106"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a4/dc/a57c98cbee7d66af75d8cefa03a7a3262430a20d886781b16c430205b5a9/tensorrt_cu13_bindings-11.1.0.106-cp311-none-manylinux_2_28_x86_64.whl", hash = "sha256:14b6073352fddc66fc859956b86a8e601f9a35ce15e8d331026a7f7947e4e683", size = 1240726, upload-time = "2026-06-16T17:28:07.464Z" },
+    { url = "https://files.pythonhosted.org/packages/51/0f/167224b106cea2bd0ce86fe258e567490c04ad15a90b71cad4497a7bb5a5/tensorrt_cu13_bindings-11.1.0.106-cp311-none-manylinux_2_35_aarch64.whl", hash = "sha256:91f8c83f4c8a8e793479d5a619996073d53487dae2ea58cdffbb06744ded8b8f", size = 1227555, upload-time = "2026-06-16T17:28:56.539Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/5c/5e332300d111e09dbfbb85e79245716fb7967a834c86062246c362c0fb32/tensorrt_cu13_bindings-11.1.0.106-cp311-none-win_amd64.whl", hash = "sha256:32a961b9c262d2fba49b63433f855ac11921e83495c29c48b57e14ae3280bdb7", size = 886201, upload-time = "2026-06-16T17:29:09.348Z" },
+    { url = "https://files.pythonhosted.org/packages/35/db/3d72889bd9ec71e981869bed490742255bc011c9d0094c73867f83776931/tensorrt_cu13_bindings-11.1.0.106-cp312-none-manylinux_2_28_x86_64.whl", hash = "sha256:c02e93843a7bbe0b1cba15fb1fa01424d240f9037326e66d21628a2f1fcf2bf2", size = 1239408, upload-time = "2026-06-16T17:29:20.619Z" },
+    { url = "https://files.pythonhosted.org/packages/76/aa/3673ea48abfeb5e75ff7566a89e1dc7b8542dd22711c8ff999cef9faf796/tensorrt_cu13_bindings-11.1.0.106-cp312-none-manylinux_2_35_aarch64.whl", hash = "sha256:2b34be566802da851f9fd6cb86428431e5d14ea527405ee86d0e3d3551ea41d3", size = 1214006, upload-time = "2026-06-16T17:29:42.57Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/a8/549fedb7a8c0b10f03f2bf27d2d38fdb8e04b4d713cf3696b79d5f95bc86/tensorrt_cu13_bindings-11.1.0.106-cp312-none-win_amd64.whl", hash = "sha256:42864885cfc87f904ee30eb817a3aa8062608a6b5b0cb3cea72feb557d83c047", size = 885665, upload-time = "2026-06-16T17:30:04.787Z" },
+    { url = "https://files.pythonhosted.org/packages/22/8c/cc33158fbf493959df03869082c734fe47c1b35e206206655b5bb4747af6/tensorrt_cu13_bindings-11.1.0.106-cp313-none-manylinux_2_28_x86_64.whl", hash = "sha256:cc0c63553a3015f1a9c6acdf9883ae636dbeb6607ace40041f4bd45487887cca", size = 1239441, upload-time = "2026-06-16T17:30:25.306Z" },
+    { url = "https://files.pythonhosted.org/packages/92/7f/8d1d9c555839fce2fd28a2466af56944b386f3b351cc8ff7f2aef13491ce/tensorrt_cu13_bindings-11.1.0.106-cp313-none-manylinux_2_35_aarch64.whl", hash = "sha256:4ebbaa9dc5aab768bef1ff1427a0cf5334bbbb5e3438a156e2ba94e4559c55dc", size = 1214005, upload-time = "2026-06-16T17:30:48.112Z" },
+    { url = "https://files.pythonhosted.org/packages/14/33/2591cc62739c035c4475525c7350809333802b8c9dbb80140966365e549a/tensorrt_cu13_bindings-11.1.0.106-cp313-none-win_amd64.whl", hash = "sha256:0c80f92cc018acdc7be99d19caa97fbf7773173ca3f28c1d5d90d943540b8eb0", size = 885570, upload-time = "2026-06-16T17:31:11.129Z" },
+    { url = "https://files.pythonhosted.org/packages/38/06/8f7aeac937fc4a9569bfe7cdbe0fbdcaffc99cbfc1207be0a23bf5fe31d5/tensorrt_cu13_bindings-11.1.0.106-cp314-none-manylinux_2_28_x86_64.whl", hash = "sha256:04d1209c30d05c0ee22b31b0c80413ed9b8a3ca8aac3e76f46168dd2f71a88b7", size = 1242358, upload-time = "2026-06-16T17:31:31.811Z" },
+    { url = "https://files.pythonhosted.org/packages/36/c1/61f6a6542a90c41c0783e4bbda36691c32f02bf122493b1847129469d8d4/tensorrt_cu13_bindings-11.1.0.106-cp314-none-manylinux_2_35_aarch64.whl", hash = "sha256:cac43a80f8dd65f75f1929f56d5e5607aaf071e5f6d092692dc303cb36382251", size = 1218636, upload-time = "2026-06-16T17:31:58.175Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/e7/ca3c8b37ce1a055ed5b97b5d2500545be16057fa78e761bcc77562c3084f/tensorrt_cu13_bindings-11.1.0.106-cp314-none-win_amd64.whl", hash = "sha256:d6e119194831dfe21c6f1c0ed1a58172ba53917cf423b885fc850b5fc67996cb", size = 886842, upload-time = "2026-06-16T17:32:15.854Z" },
+]
+
+[[package]]
+name = "tensorrt-cu13-libs"
+version = "11.1.0.106"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/f5/babf00011cdb6bbed9743cc885a39399aebc37197dbb6f8bbe7e03dab7fc/tensorrt_cu13_libs-11.1.0.106.tar.gz", hash = "sha256:6d2fe9e98847775122566c58b32691631dff8d8152b724d92447e93a23dfbefb", size = 15747, upload-time = "2026-06-16T19:40:06.288Z" }
+
+[[package]]
 name = "torch"
 version = "2.14.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1855,6 +1942,35 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/e4/94/b97e863c9ceef2bc6e082e967cbfb9065b5e232f2a60c5af0f5115a1bc31/torch-2.14.1-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:9113f94f70429f9f302bf55b090b5411269083e8a72a5d015ffcc5a7f83f2c69", size = 453998592, upload-time = "2026-09-30T17:54:38.268Z" },
     { url = "https://files.pythonhosted.org/packages/03/d8/8272157c438cc26a199a8fa0caf87985477b8a1ed8a09084eb2ae40609d8/torch-2.14.1-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:e65d5fe136e533b23c2d134377f7f126721c7c78dd75b3dbb735af082a8aeb85", size = 554578730, upload-time = "2026-09-30T17:54:54.838Z" },
     { url = "https://files.pythonhosted.org/packages/45/05/451a69a4287033d8f106f5c65f92c2c0c37229d81ea101d4b047caf758cc/torch-2.14.1-cp314-cp314t-win_amd64.whl", hash = "sha256:e07306caa1de2a4ac1467e11ecfc92fc44f523dd6a521145039aef46d913963c", size = 124400129, upload-time = "2026-09-30T17:54:12.306Z" },
+]
+
+[[package]]
+name = "torch-tensorrt"
+version = "2.14.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dllist", marker = "python_full_version >= '3.12'" },
+    { name = "filelock", marker = "python_full_version >= '3.12'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "packaging", marker = "python_full_version >= '3.12'" },
+    { name = "psutil", marker = "python_full_version >= '3.12'" },
+    { name = "tensorrt", marker = "python_full_version >= '3.12'" },
+    { name = "torch", marker = "python_full_version >= '3.12'" },
+    { name = "typing-extensions", marker = "python_full_version >= '3.12'" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/9d/3c92e50602668523679a9f71dd8648fa76adbe70fc192a6d771fdee48af6/torch_tensorrt-2.14.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:d0a5c217670e8ad129cf82d2b2ba930ae50b896310b16fb90d5e1e1f235d5b94", size = 4189500, upload-time = "2026-09-23T17:26:56.78Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/19/c6322d714de39948a369efe9d2d9158b03a5f7a82f9a4153a200b58375ec/torch_tensorrt-2.14.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:12756addfacb326d0ff99aa9f35c1534954d73afaea8492472d95b389101d707", size = 4304958, upload-time = "2026-09-23T17:26:59.423Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/ce/2053673bade076739ccb8e145e8c71ba432cee42f4fd640c6ff92d0e988c/torch_tensorrt-2.14.0-cp311-cp311-win_amd64.whl", hash = "sha256:e909b56a0036fc1cbef1ef0a6e0502c51626d00c25be1e8829c0c6fba74ec72d", size = 2248474, upload-time = "2026-09-23T17:27:00.963Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/ff/b661b1fdf84a71005888413827971ca416bca225ae508b7b0af86d320db5/torch_tensorrt-2.14.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:15c1481225c28e0d3a300b247b4eb10b217765e617f983bf740b870267d63ece", size = 4185307, upload-time = "2026-09-23T17:27:03.809Z" },
+    { url = "https://files.pythonhosted.org/packages/15/14/a9700b69d626bf6c087927f27a8992083ce509b02e4dd82596481228787c/torch_tensorrt-2.14.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:2c03ae5f26a513fd5213a4e20d857b3cff13627b916e251987ca213ac873fa57", size = 4306427, upload-time = "2026-09-23T17:27:06.131Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/5e/cb00646d4ea6a77d8bc98b26da117794dccd744302077a9bfcabc195eafa/torch_tensorrt-2.14.0-cp312-cp312-win_amd64.whl", hash = "sha256:70683e7ab38b96afd5ecac68c0dc918d54db055920761dd9f4b5697316bd390c", size = 2248586, upload-time = "2026-09-23T17:27:07.771Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/6a/e43307494e7b7e3018524906b2000bc3198e060010e34d5dbe1518f49a0e/torch_tensorrt-2.14.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:93cf2c4e8e467359a5d66578f07a2eca5e2439ccda53ed39b5cbe546ed156702", size = 4181767, upload-time = "2026-09-23T17:27:09.568Z" },
+    { url = "https://files.pythonhosted.org/packages/df/f6/107a081f7dbec9f89cd18ddf14f64d28296cfe6781184e7e9b8a285194e3/torch_tensorrt-2.14.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:c0c67f6b62b8028064e2ef54bddc8ea05f1fac9f46c17fb45ad66a078cece5f1", size = 4306823, upload-time = "2026-09-23T17:27:11.284Z" },
+    { url = "https://files.pythonhosted.org/packages/69/ca/6307c07774ab00ff8a837e6b66edb8149b1158568ebeca1ce5aebd1a3ce6/torch_tensorrt-2.14.0-cp313-cp313-win_amd64.whl", hash = "sha256:b2adde69b858a3df64d8cb8e908a3dabea0377bc7529b24e8dc5ff54c41652a3", size = 2249131, upload-time = "2026-09-23T17:27:12.819Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/82/20805ba658494b89f8cebaa95d25697a09c313bc7c438d43a459bacfb58a/torch_tensorrt-2.14.0-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:7b33749c8f2918f6c214e57d34851b43077ed12d64aed20e727b8e8c924025e2", size = 4181922, upload-time = "2026-09-23T17:27:14.6Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/a1/253f6f2fa451e9ae179289c12bc57b6107dca5a090560b2bc8494b789964/torch_tensorrt-2.14.0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:636f7547c07a6ee105b1e9f1135f162b208f7e2e1a48a81b12f5fbf2f12add5f", size = 4306903, upload-time = "2026-09-23T17:27:16.41Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/0f/3e48917613f0b6a854578ed845a3a0acc24aaa444d37c41e39ef682f0555/torch_tensorrt-2.14.0-cp314-cp314-win_amd64.whl", hash = "sha256:2e9c47af74cbd0e0dfd22d37903a6dd2ac36b27ea03133f704ddccfc0bfb6965", size = 2249875, upload-time = "2026-09-23T17:27:18.124Z" },
 ]
 
 [[package]]
