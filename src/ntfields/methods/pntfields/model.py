@@ -1,5 +1,5 @@
 import math
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import torch
 import torch.nn.functional as F
@@ -7,6 +7,9 @@ from torch import Tensor, nn
 
 from ntfields.base import SceneCondition, TravelTimeModel
 from ntfields.nn import RandomFourierFeatures
+
+if TYPE_CHECKING:
+    from ntfields.inference import InferenceModel
 
 
 def _linear(in_features: int, out_features: int) -> nn.Linear:
@@ -115,6 +118,11 @@ class PNTFieldsModel(TravelTimeModel):
     def travel_time_from_encoded_goal(self, q: Tensor, e_g: Tensor, scene: SceneCondition) -> Tensor:
         q_g, f_g = e_g[:, : q.shape[-1]], e_g[:, q.shape[-1] :]
         return (q_g - q).norm(dim=-1) / self.tau_from_encodings(self.encode(q), f_g)
+
+    def inference_model(self, scene: SceneCondition) -> "InferenceModel":
+        from ntfields.methods.pntfields.inference import inference_model
+
+        return inference_model(self)
 
     def tau_jet(self, q_s: Tensor, q_g: Tensor) -> Jet:
         """τ (B,), and its gradient and Hessian diagonal (B, 2·dim) w.r.t. [q_s, q_g]."""
