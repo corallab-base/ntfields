@@ -100,7 +100,7 @@ to `ntfields.train`.
 
 `field.accelerate()` evaluates the field through its model's inference form: weights folded into plain matmuls,
 gradients in forward mode, compiled with torch.compile and replayed from CUDA graphs. It takes the field's place in
-the planners and benchmarks (TD-NTFields only for now):
+the planners and benchmarks (TD-NTFields and P-NTFields):
 
 ```python
 fast = field.accelerate()  # "compile" (a few seconds per batch size on first use), or "eager"
