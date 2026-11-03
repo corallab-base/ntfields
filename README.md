@@ -97,6 +97,21 @@ To train on a fixed dataset instead of sampling, pass `data=` (a `PairDataset`, 
 to `ntfields.train`. The training loop underneath, `ntfields.train.fit`, takes any `PairSource`: an object with
 `.batches(batch_size, scene, generator)`, asked once per epoch, so it can draw new pairs (or scenes) every epoch.
 
+### Faster evaluation
+
+`field.accelerate()` evaluates the field through its model's inference form: weights folded into plain matmuls,
+gradients in forward mode, compiled with torch.compile and replayed from CUDA graphs. It takes the field's place in
+the planners and benchmarks (TD-NTFields only for now):
+
+```python
+fast = field.accelerate()  # "compile" (a few seconds per batch size on first use), or "eager"
+result = fast.plan(starts[0].to(device), goals[0].to(device))
+print(benchmark_ur5e(fast))
+```
+
+On an RTX 3090, MPPI on the UR5e benchmark drops from 41 to 9 ms per plan (scenarios) and from 110 to 20 ms (random
+pairs), with the same success counts.
+
 To build other arm scenes, use `ArmEnv.ur5e(points=..., spheres=...)`, which accepts point-cloud and sphere
 obstacles.
 

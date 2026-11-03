@@ -7,6 +7,7 @@ from torch import Tensor, nn
 
 if TYPE_CHECKING:
     from ntfields.data.pair_sampler import Sampler
+    from ntfields.inference import InferenceModel
     from ntfields.problem import Problem
     from ntfields.train.callbacks import Callback
 
@@ -83,6 +84,14 @@ class TravelTimeModel(nn.Module, ABC):
     def travel_time_from_encoded_goal(self, q: Tensor, e_g: Tensor, scene: SceneCondition) -> Tensor:
         """T(q, q_g) (B,) for a batch q (B, dim) and e_g = encode_goal(q_g)."""
         return self(q, e_g.expand(q.shape[0], -1), scene)
+
+    def inference_model(self, scene: SceneCondition) -> "InferenceModel | None":
+        """The model's inference-only form, for ntfields.accel: its functions are plain forward networks, with every
+        training-time indirection folded away, and the gradients optional. None: the model has none.
+
+        `scene` is fixed into the functions, which take tensors only. A scene-conditioned model would instead take
+        an encoded scene as an input, as the goal is (no model reads the scene yet)."""
+        return None
 
 
 @dataclass
