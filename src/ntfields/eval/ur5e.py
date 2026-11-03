@@ -3,11 +3,11 @@ from collections.abc import Sequence
 import torch
 
 from ntfields.envs.arm import ArmEnv, ntrl_random_pairs, ntrl_scenarios
-from ntfields.field import TrainedField
+from ntfields.field import Field
 from ntfields.plan import mppi
 
 
-def benchmark_ur5e(field: TrainedField, seeds: Sequence[int] = (2024, 1, 2)) -> dict[str, list[dict[str, int]]]:
+def benchmark_ur5e(field: Field, seeds: Sequence[int] = (2024, 1, 2)) -> dict[str, list[dict[str, int]]]:
     """The UR5e evaluation: ntrl-demo's 5 scenarios and 50 random pairs, planned with MPPI once per
     seed. A plan succeeds if MPPI converges and every waypoint has a raw clearance (without the offset) above 0.
 
@@ -15,7 +15,7 @@ def benchmark_ur5e(field: TrainedField, seeds: Sequence[int] = (2024, 1, 2)) -> 
     """
     env = field.problem.env
     assert isinstance(env, ArmEnv), "benchmark_ur5e needs the UR5e ArmEnv"
-    device = next(field.model.parameters()).device
+    device = field.device
     results: dict[str, list[dict[str, int]]] = {}
     for name, (starts, goals) in (("scenarios", ntrl_scenarios()), ("random", ntrl_random_pairs())):
         results[name] = []
