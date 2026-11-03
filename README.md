@@ -22,6 +22,7 @@ Implemented methods:
 ```bash
 uv sync                    # dev environment (all extras)
 pip install "ntfields[cli,gt]" # as a library: CLI (tyro) and FMM ground truth (scikit-fmm)
+pip install "ntfields[tensorrt]"  # TensorRT backend and engine export (Python 3.12+)
 ```
 
 ## TD-NTFields on a 2D point mass
@@ -110,6 +111,19 @@ print(benchmark_ur5e(fast))
 
 On an RTX 3090, MPPI on the UR5e benchmark drops from 41 to 9 ms per plan (scenarios) and from 110 to 20 ms (random
 pairs), with the same success counts.
+
+With the `[tensorrt]` extra (Python 3.12+), `field.accelerate("tensorrt", precision="fp16")` builds a TensorRT engine
+per function on its first call; fp16 applies to the travel times only (TD-NTFields), the goal encoding and gradients
+stay fp32. In Python it plans about as fast as `"compile"`; its main use is exporting engines for other runtimes:
+
+```bash
+ntfields export --ckpt runs/.../ckpt.pt --out engines/ur5e --precision fp32 fp16
+```
+
+This writes one `<function>_<precision>.engine` per inference function (`encode_goal`, `travel_time`,
+`pair_travel_time`, `gradient`, `pair_gradient`; `--functions` picks some), reference inputs and outputs of the
+original model to check another runtime against, and a `meta.json` with every engine's binding names and shapes.
+Engines load only with the TensorRT version they were built with, which `meta.json` records.
 
 To build other arm scenes, use `ArmEnv.ur5e(points=..., spheres=...)`, which accepts point-cloud and sphere
 obstacles.

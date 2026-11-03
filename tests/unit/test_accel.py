@@ -105,7 +105,7 @@ def test_accelerate_needs_an_inference_model():
     with pytest.raises(ValueError, match="no inference model"):
         accelerate(TrainedField(method, problem, method.build_model(problem)))
     with pytest.raises(ValueError, match="unknown backend"):
-        accelerate(_td_field(), "tensorrt")  # pyright: ignore[reportArgumentType]
+        accelerate(_td_field(), "onnx")  # pyright: ignore[reportArgumentType]
 
 
 @requires_cuda

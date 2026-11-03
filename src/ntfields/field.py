@@ -11,7 +11,7 @@ from ntfields.plan import PLANNERS, PlanResult
 from ntfields.problem import Problem
 
 if TYPE_CHECKING:
-    from ntfields.accel import AcceleratedField, Backend
+    from ntfields.accel import AcceleratedField, Backend, Precision
 
 
 class Field(Protocol):
@@ -79,8 +79,14 @@ class TrainedField:
         """Single query with `planner` (default: the method's default planner)."""
         return PLANNERS[planner or self.method.default_planner](self, start, goal)
 
-    def accelerate(self, backend: "Backend" = "compile", cuda_graphs: bool = True) -> "AcceleratedField":
+    def accelerate(
+        self,
+        backend: "Backend" = "compile",
+        cuda_graphs: bool = True,
+        precision: "Precision" = "fp32",
+        batch: tuple[int, int, int] = (1, 128, 65536),
+    ) -> "AcceleratedField":
         """This field, evaluated through its model's inference form (see `ntfields.accel.accelerate`)."""
         from ntfields.accel import accelerate
 
-        return accelerate(self, backend, cuda_graphs)
+        return accelerate(self, backend, cuda_graphs, precision, batch)
