@@ -8,6 +8,8 @@ Backends:
 - "eager": the inference form as is (folded weights, forward-mode gradients)
 - "compile": torch.compile (inductor) of each inference function, specialized per batch size (past torch._dynamo's
   recompile limit, 8 sizes per function, further sizes run eagerly)
+- "tensorrt": a TensorRT engine per inference function, built on its first call with a dynamic batch within `batch`,
+  in `precision` (see ntfields.accel.tensorrt; needs the [tensorrt] extra)
 
 With `cuda_graphs` (on a CUDA field), each function is also replayed from a CUDA graph per batch size, which
 removes the launch overhead that dominates at planning batch sizes.
@@ -29,7 +31,8 @@ from ntfields.inference import InferenceModel
 from ntfields.plan import PLANNERS, PlanResult
 from ntfields.problem import Problem
 
-Backend = Literal["eager", "compile"]
+Backend = Literal["eager", "compile", "tensorrt"]
+Precision = Literal["fp32", "fp16"]
 # on the UR5e MPPI benchmark, max-autotune builds in 52 s instead of 4 s and plans at most 15% faster; CUDA graphs
 # come from CudaGraphs, not inductor's modes
 COMPILE_MODE = "default"
@@ -76,19 +79,34 @@ class AcceleratedField:
         return PLANNERS[planner or self.method.default_planner](self, start, goal)
 
 
-def accelerate(field: TrainedField, backend: Backend = "compile", cuda_graphs: bool = True) -> AcceleratedField:
+def accelerate(
+    field: TrainedField,
+    backend: Backend = "compile",
+    cuda_graphs: bool = True,
+    precision: Precision = "fp32",
+    batch: tuple[int, int, int] = (1, 128, 65536),
+) -> AcceleratedField:
     """`field` evaluated through its model's inference form on `backend`; values and gradients match the field's
-    up to rounding. Gradients the inference form leaves out are absent: asking for them raises."""
+    up to rounding (and float16 weights, for the tensorrt backend's fp16). Gradients the inference form leaves out are
+    absent: asking for them raises. `precision` and `batch` (min, opt, max) are the tensorrt backend's."""
     inference = field.model.inference_model(field.problem.env.condition())
     if inference is None:
         raise ValueError(f"{type(field.model).__name__} ({field.method.name}) has no inference model to accelerate")
+    if backend not in ("eager", "compile", "tensorrt"):
+        raise ValueError(f"unknown backend {backend!r}; available: eager, compile, tensorrt")
+    if backend != "tensorrt" and precision != "fp32":
+        raise ValueError(f"precision {precision!r} needs the tensorrt backend")
     if backend == "compile":
         inference = inference.map(lambda fn: torch.compile(fn, mode=COMPILE_MODE, dynamic=False))
-    elif backend != "eager":
-        raise ValueError(f"unknown backend {backend!r}; available: eager, compile")
+    elif backend == "tensorrt":
+        if field.device.type != "cuda":
+            raise ValueError("the tensorrt backend needs a CUDA field")
+        from ntfields.accel.tensorrt import tensorrt_inference
+
+        inference = tensorrt_inference(inference, precision, batch)
     if cuda_graphs and field.device.type == "cuda":
         inference = inference.map(CudaGraphs)
     return AcceleratedField(field, inference)
 
 
-__all__ = ["AcceleratedField", "Backend", "CudaGraphs", "accelerate"]
+__all__ = ["AcceleratedField", "Backend", "CudaGraphs", "Precision", "accelerate"]

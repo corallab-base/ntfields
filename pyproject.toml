@@ -14,6 +14,8 @@ dependencies = [
 arm = ["pytorch-kinematics>=0.7"]
 cli = ["tyro>=0.9"]
 gt = ["scikit-fmm>=2024.5.29"]
+# serialized engines load only with the TensorRT they were built with; no wheels for Python 3.11
+tensorrt = ["torch-tensorrt>=2.14,<2.15; python_version >= '3.12'"]
 
 [project.scripts]
 ntfields = "ntfields.cli:main"
@@ -26,6 +28,7 @@ dev = [
     "pytorch-kinematics>=0.7",
     "ruff>=0.14",
     "scikit-fmm>=2024.5.29",
+    "torch-tensorrt>=2.14,<2.15; python_version >= '3.12'",
     "tyro>=0.9",
 ]
 

@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Annotated, Any, Generic, Literal, TypeVar, Union
 
 try:
@@ -9,8 +10,10 @@ except ImportError as e:
     raise SystemExit("the ntfields CLI needs tyro: pip install 'ntfields[cli]'") from e
 
 import ntfields
+from ntfields.accel import Precision
 from ntfields.base import MethodConfig, SpeedModel
 from ntfields.envs import load_env
+from ntfields.inference import Function
 from ntfields.registry import available, default_config, get_method
 from ntfields.speed import Clipped, ClippedEased, Smoothstep
 
@@ -41,6 +44,18 @@ class Train(Generic[C]):
     train: ntfields.TrainConfig = field(default_factory=ntfields.TrainConfig)
 
 
+@dataclass
+class Export:
+    """Export TensorRT engines of a trained field, for runtimes outside Python (needs the [tensorrt] extra)."""
+
+    ckpt: Path
+    out: Path
+    functions: tuple[Function, ...] = ()  # default: every function the model's inference form has
+    precision: tuple[Precision, ...] = ("fp32",)  # of travel_time and pair_travel_time; the others are fp32
+    batch: tuple[int, int, int] = (1, 128, 65536)  # min, opt, max
+    device: str = "cuda"
+
+
 def main(args: Sequence[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     names = available()
@@ -51,9 +66,16 @@ def main(args: Sequence[str] | None = None) -> None:
             for name, cfg in defaults.items()
         )
     ]
-    command: Train[Any] = tyro.extras.subcommand_cli_from_dict(
-        {"train": Train[choice]}, args=args, config=(tyro.conf.CascadeSubcommandArgs,)
+    command: Train[Any] | Export = tyro.extras.subcommand_cli_from_dict(
+        {"train": Train[choice], "export": Export}, args=args, config=(tyro.conf.CascadeSubcommandArgs,)
     )
+    if isinstance(command, Export):
+        from ntfields.accel.tensorrt import export
+
+        field_ = ntfields.load(command.ckpt, device=command.device)
+        export(field_, command.out, command.functions, command.precision, command.batch)
+        print(f"engines: {command.out}")
+        return
     name = next(n for n, cfg in defaults.items() if type(cfg) is type(command.method))
     method = get_method(name)(command.method)
     problem = ntfields.Problem(load_env(command.env), command.speed.build())

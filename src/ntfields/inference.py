@@ -8,12 +8,14 @@ methods, which is what TrainedField queries through.
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import torch
 from torch import Tensor
 
 from ntfields.base import SceneCondition, TravelTimeModel
+
+Function = Literal["encode_goal", "travel_time", "pair_travel_time", "gradient", "pair_gradient"]
 
 
 @dataclass
@@ -24,6 +26,9 @@ class InferenceModel:
     gradient: Callable[[Tensor, Tensor], tuple[Tensor, Tensor]] | None = None  # q, e_g -> T, ∇_q T (B, dim)
     # q_s, q_g -> T, ∇_{q_s} T, ∇_{q_g} T
     pair_gradient: Callable[[Tensor, Tensor], tuple[Tensor, Tensor, Tensor]] | None = None
+    # the functions are nn.Modules that also run with float16 weights (`.half()`) on float32 inputs, giving float32
+    # outputs (what a TensorRT fp16 build needs)
+    float16_weights: bool = False
 
     def map(self, wrap: Callable[[Callable[..., Any]], Callable[..., Any]]) -> "InferenceModel":
         """The same model with every function it has wrapped (e.g. compiled)."""
@@ -33,6 +38,7 @@ class InferenceModel:
             wrap(self.pair_travel_time),
             None if self.gradient is None else wrap(self.gradient),
             None if self.pair_gradient is None else wrap(self.pair_gradient),
+            self.float16_weights,
         )
 
 
