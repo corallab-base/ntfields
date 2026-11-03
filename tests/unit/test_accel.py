@@ -29,9 +29,17 @@ def _td_field(dim: int = 2, dtype: torch.dtype = torch.float64, device: str = "c
     return TrainedField(method, problem, model.to(dtype=dtype, device=device).eval())
 
 
+def _pntfields_field() -> TrainedField:
+    torch.manual_seed(0)
+    method = create("pntfields")
+    problem = Problem(load_env("box2d/empty"), Clipped())
+    return TrainedField(method, problem, method.build_model(problem).double().eval())
+
+
+@pytest.mark.parametrize("method", ["td_ntfields", "pntfields"])
 @pytest.mark.parametrize("name", ["encode_goal", "travel_time", "gradient", "pair_travel_time", "pair_gradient"])
-def test_td_inference_model_matches_autograd(name: str):
-    field = _td_field()
+def test_inference_model_matches_autograd(method: str, name: str):
+    field = _td_field() if method == "td_ntfields" else _pntfields_field()
     scene = field.problem.env.condition()
     folded, reference = field.model.inference_model(scene), autograd_inference(field.model, scene)
     assert folded is not None
@@ -40,6 +48,17 @@ def test_td_inference_model_matches_autograd(name: str):
     args = {"encode_goal": (y[:1],), "travel_time": (q, e_g), "gradient": (q, e_g)}.get(name, (q, y))
     with torch.no_grad():
         torch.testing.assert_close(getattr(folded, name)(*args), getattr(reference, name)(*args))
+
+
+def test_pntfields_pair_gradient_at_coincident_ends():
+    """‖q_g - q_s‖ has no derivative at q_s = q_g; the forward-mode gradients take it as 0, as autograd does."""
+    field = _pntfields_field()
+    scene = field.problem.env.condition()
+    folded, reference = field.model.inference_model(scene), autograd_inference(field.model, scene)
+    assert folded is not None and folded.pair_gradient is not None and reference.pair_gradient is not None
+    q = torch.rand(8, 2, dtype=torch.float64) - 0.5
+    for ours, expected in zip(folded.pair_gradient(q, q), reference.pair_gradient(q, q), strict=True):
+        torch.testing.assert_close(ours, expected)
 
 
 def test_accelerated_field_matches_field():
@@ -82,7 +101,7 @@ def test_gradients_are_absent_without_forward_mode_ones(monkeypatch: pytest.Monk
 
 def test_accelerate_needs_an_inference_model():
     problem = Problem(load_env("box2d/empty"), Clipped())
-    method = create("pntfields")
+    method = create("euclidean")
     with pytest.raises(ValueError, match="no inference model"):
         accelerate(TrainedField(method, problem, method.build_model(problem)))
     with pytest.raises(ValueError, match="unknown backend"):
