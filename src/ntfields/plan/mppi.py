@@ -6,11 +6,11 @@ from torch import Tensor
 from ntfields.plan.gradient_bidirectional import PlanResult
 
 if TYPE_CHECKING:
-    from ntfields.field import TrainedField
+    from ntfields.field import Field
 
 
 def mppi(
-    field: "TrainedField",
+    field: "Field",
     start: Tensor,
     goal: Tensor,
     samples: int = 50,

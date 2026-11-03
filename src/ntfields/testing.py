@@ -1,12 +1,14 @@
+import copy
 from dataclasses import asdict
 from typing import Any
 
 import torch
 
-from ntfields.base import Method, TrainState
+from ntfields.base import Batch, Method, TrainState, TravelTimeModel
 from ntfields.checkpoint import config_from_dict
 from ntfields.data import sample_pairs
 from ntfields.envs import load_env
+from ntfields.inference import autograd_inference
 from ntfields.problem import Problem
 from ntfields.speed import Clipped
 
@@ -33,8 +35,33 @@ def check_method(method_cls: type[Method[Any]], problem: Problem | None = None) 
         model(batch.q_s, q_g.expand_as(batch.q_s), batch.scene),
         msg="travel_time_from_encoded_goal must match forward",
     )
+    _check_inference_model(model, batch)
 
     out = method.loss(model, batch, TrainState(model=model, optimizer=method.optimizer(model)))
     assert out.total.ndim == 0 and out.total.isfinite(), "loss must be a finite scalar"
     out.total.backward()
     assert any(p.grad is not None and p.grad.abs().sum() > 0 for p in model.parameters()), "loss has no gradient"
+
+
+def _check_inference_model(model: TravelTimeModel, batch: Batch) -> None:
+    """A model's inference form, if it has one, matches autograd through the model in the functions it provides (in
+    float64, where folding and forward-mode differentiation only change the rounding)."""
+    model = copy.deepcopy(model).double().eval()
+    inference = model.inference_model(batch.scene)
+    if inference is None:
+        return
+    reference = autograd_inference(model, batch.scene)
+    q_s, q_g = batch.q_s.double(), batch.q_g.double()
+    e_g = reference.encode_goal(q_g[:1])
+    for name, args in (
+        ("encode_goal", (q_g[:1],)),
+        ("travel_time", (q_s, e_g)),
+        ("gradient", (q_s, e_g)),
+        ("pair_travel_time", (q_s, q_g)),
+        ("pair_gradient", (q_s, q_g)),
+    ):
+        if getattr(inference, name) is None:
+            continue
+        with torch.no_grad():
+            ours, expected = getattr(inference, name)(*args), getattr(reference, name)(*args)
+        torch.testing.assert_close(ours, expected, msg=f"inference_model().{name} must match autograd")

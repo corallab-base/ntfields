@@ -7,9 +7,9 @@ from ntfields.plan.gradient_bidirectional import PlanResult, gradient_bidirectio
 from ntfields.plan.mppi import mppi
 
 if TYPE_CHECKING:
-    from ntfields.field import TrainedField
+    from ntfields.field import Field
 
-Planner = Callable[["TrainedField", Tensor, Tensor], PlanResult]
+Planner = Callable[["Field", Tensor, Tensor], PlanResult]
 
 PLANNERS: dict[str, Planner] = {"gradient_bidirectional": gradient_bidirectional, "mppi": mppi}
 

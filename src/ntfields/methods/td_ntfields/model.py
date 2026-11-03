@@ -1,4 +1,5 @@
 import math
+from typing import TYPE_CHECKING
 
 import torch
 import torch.nn.functional as F
@@ -6,6 +7,9 @@ from torch import Tensor, nn
 
 from ntfields.base import SceneCondition, TravelTimeModel
 from ntfields.nn import RandomFourierFeatures
+
+if TYPE_CHECKING:
+    from ntfields.inference import InferenceModel
 
 
 class LipschitzLinear(nn.Linear):
@@ -92,7 +96,16 @@ class TDMetricModel(TravelTimeModel):
 
     def travel_time_from_embeddings(self, e_s: Tensor, e_g: Tensor) -> Tensor:
         """T from the embeddings e_s (B, hidden) and e_g (B or 1, hidden)."""
-        d = ((e_s - e_g) ** 2 + 1e-6).sqrt().view(e_s.shape[0], -1, self.group)
-        t = self.temperature
-        smooth_max = (torch.logsumexp(t * d, dim=-1) - math.log(self.group)) / t
-        return self.out_scale * smooth_max.sum(dim=-1)
+        return metric_travel_time(e_s, e_g, self.group, self.temperature, self.out_scale)
+
+    def inference_model(self, scene: SceneCondition) -> "InferenceModel":
+        from ntfields.methods.td_ntfields.inference import fold
+
+        return fold(self)
+
+
+def metric_travel_time(e_s: Tensor, e_g: Tensor, group: int, temperature: float, out_scale: float) -> Tensor:
+    """out_scale · Σ_groups smoothmax_group |e_s - e_g|, for e_s (B, hidden) and e_g (B or 1, hidden)."""
+    d = ((e_s - e_g) ** 2 + 1e-6).sqrt().view(e_s.shape[0], -1, group)
+    smooth_max = (torch.logsumexp(temperature * d, dim=-1) - math.log(group)) / temperature
+    return out_scale * smooth_max.sum(dim=-1)

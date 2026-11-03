@@ -1,33 +1,48 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 import torch
 from torch import Tensor
 
-from ntfields.base import Method, SceneCondition, TravelTimeModel
+from ntfields.base import Method, TravelTimeModel
+from ntfields.inference import InferenceModel, autograd_inference
 from ntfields.plan import PLANNERS, PlanResult
 from ntfields.problem import Problem
+
+if TYPE_CHECKING:
+    from ntfields.accel import AcceleratedField, Backend
+
+
+class Field(Protocol):
+    """What planners and evaluation query: a TrainedField or an AcceleratedField."""
+
+    @property
+    def problem(self) -> Problem: ...
+    @property
+    def device(self) -> torch.device: ...
+    def travel_time(self, q_s: Tensor, q_g: Tensor) -> Tensor: ...
+    def gradient(self, q_s: Tensor, q_g: Tensor) -> tuple[Tensor, Tensor]: ...
+    def towards(self, goal: Tensor) -> "GoalField": ...
 
 
 @dataclass
 class GoalField:
     """T(·, q_g) for one goal, encoded once (see `TrainedField.towards`)."""
 
-    model: TravelTimeModel
-    scene: SceneCondition
-    e_g: Tensor  # the model's encode_goal(q_g)
+    inference: InferenceModel
+    e_g: Tensor  # inference.encode_goal(q_g)
 
     def travel_time(self, q: Tensor) -> Tensor:
         with torch.no_grad():
-            return self.model.travel_time_from_encoded_goal(q, self.e_g, self.scene)
+            return self.inference.travel_time(q, self.e_g)
 
     def gradient(self, q: Tensor) -> Tensor:
         """∇_q T(q, q_g)."""
-        with torch.enable_grad():
-            q = q.detach().requires_grad_(True)
-            (g,) = torch.autograd.grad(self.model.travel_time_from_encoded_goal(q, self.e_g, self.scene).sum(), q)
-        return g
+        if self.inference.gradient is None:
+            raise ValueError("this inference model has no gradients; use the TrainedField's")
+        with torch.no_grad():
+            return self.inference.gradient(q, self.e_g)[1]
 
 
 @dataclass
@@ -36,6 +51,10 @@ class TrainedField:
     problem: Problem
     model: TravelTimeModel
     ckpt_path: Path | None = None
+
+    @property
+    def device(self) -> torch.device:
+        return next(self.model.parameters()).device
 
     def travel_time(self, q_s: Tensor, q_g: Tensor) -> Tensor:
         with torch.no_grad():
@@ -52,10 +71,16 @@ class TrainedField:
 
     def towards(self, goal: Tensor) -> GoalField:
         """T(·, goal) for a goal (dim,), which is encoded once instead of once per query."""
-        scene = self.problem.env.condition()
+        inference = autograd_inference(self.model, self.problem.env.condition())
         with torch.no_grad():
-            return GoalField(self.model, scene, self.model.encode_goal(goal, scene))
+            return GoalField(inference, inference.encode_goal(goal[None]))
 
     def plan(self, start: Tensor, goal: Tensor, planner: str | None = None) -> PlanResult:
         """Single query with `planner` (default: the method's default planner)."""
         return PLANNERS[planner or self.method.default_planner](self, start, goal)
+
+    def accelerate(self, backend: "Backend" = "compile", cuda_graphs: bool = True) -> "AcceleratedField":
+        """This field, evaluated through its model's inference form (see `ntfields.accel.accelerate`)."""
+        from ntfields.accel import accelerate
+
+        return accelerate(self, backend, cuda_graphs)

@@ -5,7 +5,7 @@ import torch
 from torch import Tensor
 
 if TYPE_CHECKING:
-    from ntfields.field import TrainedField
+    from ntfields.field import Field
 
 
 @dataclass
@@ -15,7 +15,7 @@ class PlanResult:
 
 
 def gradient_bidirectional(
-    field: "TrainedField",
+    field: "Field",
     start: Tensor,
     goal: Tensor,
     beta: float = 0.03,
