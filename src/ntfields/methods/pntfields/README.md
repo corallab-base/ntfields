@@ -14,6 +14,7 @@ The reference code is [ruiqini/P-NTFields](https://github.com/ruiqini/P-NTFields
 | `pntfields` | generic reference: the `test`/`c3d` data settings (margin 0.1, offset 0.01) |
 | `pntfields_arm` | the reference arm recipe: margin 0.5/12, offset margin/10, goal step up to √3, 2·10⁶ pairs |
 | `pntfields_2d` | `pntfields` with the α and lr schedules compressed 10×, for 1000-epoch point-mass runs |
+| `pntfields_3d` | `pntfields_2d` for 3D point masses. The reference's 3D (`c3d`) recipe is `pntfields` for 10000 epochs, about 2–6 h per run; the compressed one keeps `box3d` affordable |
 
 ## Model and loss
 

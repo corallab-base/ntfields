@@ -38,6 +38,7 @@ def build_suite(
     generator = torch.Generator().manual_seed(seed)
     files: dict[str, str] = {}
     problems = []
+    tunneling: dict[str, float] = {}
     for scene_name, scene in scenes.items():
         problem = SuiteProblem(scene_name, scene, speed, {}).problem()
         queries = {
@@ -50,7 +51,9 @@ def build_suite(
             files[rel] = sha256(base / rel)
         problems.append({"name": scene_name, "scene": f"scenes/{scene_name}.json",
                          "queries": f"queries/{scene_name}.json", "speed": speed})  # fmt: skip
-        log.info("%s/%s: %s", base.name, scene_name, {s: len(q) for s, q in queries.items()})
+        tunneling[scene_name] = tunneling_share(problem, queries["test"], fmm_resolution, protocol.reference_tol)
+        log.info("%s/%s: %s, tunneling %.1f%%", base.name, scene_name, {s: len(q) for s, q in queries.items()},
+                 100 * tunneling[scene_name])  # fmt: skip
     meta = {
         "format_version": FORMAT_VERSION,
         "name": name,
@@ -59,7 +62,13 @@ def build_suite(
         "leaderboard": leaderboard,
         "min_seeds": min_seeds,
         "protocol": vars(protocol),
-        "reference": {"kind": "fmm", "resolution": fmm_resolution, "seed": seed, "min_distance": min_distance},
+        "reference": {
+            "kind": "fmm",
+            "resolution": fmm_resolution,
+            "seed": seed,
+            "min_distance": min_distance,
+            "tunneling": tunneling,
+        },
         "problems": problems,
         "files": files,
     }
@@ -109,3 +118,17 @@ def reference_queries(
         torch.tensor([r[3] for r in rows], dtype=torch.float64),
         torch.tensor([r[4] for r in rows]),
     )
+
+
+def tunneling_share(problem: Problem, queries: Queries, fmm_resolution: int, tol: float) -> float:
+    """Share of queries where S* makes passing through obstacles cheaper than the reference: the FMM travel time
+    with obstacles passable is below (1 - tol) * t*. A field that fits S* faithfully may plan through obstacles
+    there, so the suite reports it; it filters nothing."""
+    from ntfields.gt import fmm_travel_time
+
+    assert queries.t_star is not None
+    cheaper = [
+        float(fmm_travel_time(problem, g, fmm_resolution).value(s[None])[0]) < (1 - tol) * float(t)
+        for s, g, t in zip(queries.start, queries.goal, queries.t_star, strict=True)
+    ]
+    return sum(cheaper) / len(cheaper)

@@ -1,0 +1,78 @@
+{
+  "format_version": 1,
+  "name": "box3d",
+  "version": 1,
+  "description": "3D point mass in [-1, 1]^3: empty, four spheres, clutter, a window",
+  "leaderboard": true,
+  "min_seeds": 3,
+  "protocol": {
+    "margin": 0.01,
+    "resolution": 0.005,
+    "endpoint_tol": 0.0001,
+    "reference_tol": 0.02
+  },
+  "reference": {
+    "kind": "fmm",
+    "resolution": 201,
+    "seed": 0,
+    "min_distance": 0.5,
+    "tunneling": {
+      "empty": 0.0,
+      "four_spheres": 0.0,
+      "clutter": 0.0,
+      "window": 0.0
+    }
+  },
+  "problems": [
+    {
+      "name": "empty",
+      "scene": "scenes/empty.json",
+      "queries": "queries/empty.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.01,
+        "dmax": 0.1
+      }
+    },
+    {
+      "name": "four_spheres",
+      "scene": "scenes/four_spheres.json",
+      "queries": "queries/four_spheres.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.01,
+        "dmax": 0.1
+      }
+    },
+    {
+      "name": "clutter",
+      "scene": "scenes/clutter.json",
+      "queries": "queries/clutter.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.01,
+        "dmax": 0.1
+      }
+    },
+    {
+      "name": "window",
+      "scene": "scenes/window.json",
+      "queries": "queries/window.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.01,
+        "dmax": 0.1
+      }
+    }
+  ],
+  "files": {
+    "scenes/empty.json": "2a1a1da786d842f317f2aa77f162a490b4ec908f83fb302e5cca8f271e770112",
+    "queries/empty.json": "e7206bfbed58f2b64557b02a1f81e9a76cbb99e47abe2fb0bd8aed15f5b4636c",
+    "scenes/four_spheres.json": "36e4728be4eca2943273deaefb9dceba8069c197012d8b07973559883b55174c",
+    "queries/four_spheres.json": "375b0c1f5db6290d436303d78b70967d82d8c5eebf4abeb0cff6b0970bdb7f5b",
+    "scenes/clutter.json": "1c2f064508c75344d039bcf732738ae32aa1f637a4244558efa12795482ee3e2",
+    "queries/clutter.json": "323213f17d7732481ddeebf963c7d029a5659b0a464f1d077d71a318b56391fa",
+    "scenes/window.json": "8babc5a4ee239048cd3a393bd96c94b9c0bdc7ca4ad9ac6cd8082ef581b1862f",
+    "queries/window.json": "c067f149a71e5a2e4a2cc0e98314fd7d86b2de00c6c4de7c61309a55bed09ecc"
+  }
+}

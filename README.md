@@ -117,6 +117,7 @@ A released suite never changes; any change is a new version, and results only co
 | Suite | Problems | Queries (dev / test) | Reference |
 |---|---|---|---|
 | `box2d-v1` | 2D point mass in [−1, 1]²: `empty`, `one_sphere`, `clutter`, `walls`, `thick_walls`; S\* = `Clipped(0.01, 0.1)` | 50 / 200 each | FMM |
+| `box3d-v1` | 3D point mass in [−1, 1]³: `empty`, `four_spheres`, `clutter`, `window` (a 0.3-thick plate with one hole); S\* = `Clipped(0.01, 0.1)` | 50 / 200 each | FMM |
 | `smoke-v1` | `one_sphere` only, for CI (not ranked) | 4 / 4 | FMM |
 
 **Protocol.** A configuration is valid if it is inside the bounds with clearance above the suite's margin (0.01 in

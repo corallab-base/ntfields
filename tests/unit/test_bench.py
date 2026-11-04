@@ -20,9 +20,10 @@ from ntfields.bench import (
     spl,
     validate,
 )
-from ntfields.bench.build import build_suite
+from ntfields.bench.build import build_suite, tunneling_share
 from ntfields.bench.cli import main as bench_main
 from ntfields.bench.protocol import densify
+from ntfields.bench.suite import Queries, SuiteProblem
 from ntfields.field import TrainedField
 from ntfields.gt import fmm_travel_time
 from ntfields.methods.euclidean.method import Euclidean, EuclideanConfig, EuclideanModel
@@ -81,6 +82,8 @@ def test_build_load_and_checksums(tmp_path: Path):
     q = suite.get("one_sphere").queries["test"]
     assert len(q) == 3 and q.c_star is not None and q.t_star is not None
     assert ((q.start - q.goal).norm(dim=-1) >= 0.5).all()
+    meta = json.loads((tmp_path / "tiny-v1" / "suite.json").read_text())
+    assert meta["reference"]["tunneling"] == {"one_sphere": 0.0}  # a 0.6-wide sphere is never worth crossing
     with pytest.raises(FileExistsError):
         _tiny_suite(tmp_path)  # released suites are never overwritten
     path = tmp_path / "tiny-v1" / "queries" / "one_sphere.json"
@@ -153,7 +156,7 @@ def test_bench_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
 
 
 def test_committed_suites_load():
-    for name in ("smoke-v1", "box2d-v1"):
+    for name in ("smoke-v1", "box2d-v1", "box3d-v1"):
         suite = load_suite(name, SUITES)
         for p in suite.problems:
             q = p.queries["test"]
@@ -171,3 +174,14 @@ def test_rollbacks_are_counted(problem: Problem):
     rollback = LossRatioRollback(threshold=1e-9, max_retries=3)  # rejects every epoch until the retry cap
     train("euclidean", problem, Epochs(2), train_cfg=tc, callbacks=[rollback, stats])
     assert stats.epochs == 2 and stats.rollbacks == 2 * 2  # each epoch: 2 rejections, then accepted at the cap
+
+
+def test_tunneling_share_flags_thin_walls():
+    wall = {"kind": "sphere_box", "bounds": [[-1, 1], [-1, 1]], "boxes": [{"center": [0, 0.1], "size": [0.04, 1.8]}]}
+    problem = SuiteProblem("wall", wall, {"kind": "clipped", "dmin": 0.01, "dmax": 0.1}, {}).problem()
+    start, goal = torch.tensor([[-0.5, -0.5]]), torch.tensor([[0.5, -0.5]])  # the gap is at the bottom edge
+    t_star = fmm_travel_time(problem, goal[0], 101, margin=0.01).value(start)
+    assert tunneling_share(problem, Queries(start, goal, t_star=t_star.double()), 101, 0.02) == 0.0  # gap is close
+    start, goal = torch.tensor([[-0.5, 0.8]]), torch.tensor([[0.5, 0.8]])  # far from the gap: crossing is cheaper
+    t_star = fmm_travel_time(problem, goal[0], 101, margin=0.01).value(start)
+    assert tunneling_share(problem, Queries(start, goal, t_star=t_star.double()), 101, 0.02) == 1.0

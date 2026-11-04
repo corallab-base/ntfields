@@ -46,3 +46,4 @@ class PNTFields(Method[PNTFieldsConfig]):
 
 register_preset("pntfields_arm", PNTFields, PNTFieldsConfig.arm)
 register_preset("pntfields_2d", PNTFields, PNTFieldsConfig.planar)
+register_preset("pntfields_3d", PNTFields, PNTFieldsConfig.planar)  # same config, for box3d

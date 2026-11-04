@@ -36,4 +36,5 @@ class TDNTFields(Method[TDNTFieldsConfig]):
 register_preset("td_ntfields_arm", TDNTFields, TDNTFieldsConfig.arm)
 register_preset("td_ntfields_arm_ntrl", TDNTFields, TDNTFieldsConfig.arm_ntrl)
 register_preset("td_ntfields_2d", TDNTFields, TDNTFieldsConfig.planar)
+register_preset("td_ntfields_3d", TDNTFields, TDNTFieldsConfig.planar)  # same config; its recipe trains longer
 register_preset("td_ntfields_stable", TDNTFields, TDNTFieldsConfig.stable)

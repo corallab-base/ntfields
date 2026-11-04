@@ -17,6 +17,7 @@ so a seed reproduces a run bit for bit on the same PyTorch build.
 | `td_ntfields_arm` | UR5e, ntrl-demo's recipe fixed for clean labels: `models/metric_arm` at the width of the published UR5 run, `UR5eSurfacePairs` (IK) pairs, gradient clipping 5.0, no rollback |
 | `td_ntfields_arm_ntrl` | UR5e, ntrl-demo's recipe (rollback, `NearSurface` pairs) |
 | `td_ntfields_2d` | a recipe for point masses in [−1, 1]²: the arm model settings and `SurfaceMix` pairs |
+| `td_ntfields_3d` | `td_ntfields_2d`'s config for 3D point masses; its benchmark recipe trains 5000 epochs, the paper's 3D setting (the reference code has no 3D recipe) |
 | `td_ntfields_stable` | `td_ntfields` with the causality weight detached |
 
 ## Model and loss

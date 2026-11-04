@@ -19,6 +19,8 @@ RECIPES: dict[str, Recipe] = {
     "euclidean": Recipe(epochs=100),
     "td_ntfields_2d": Recipe(epochs=1000, n_pairs=1_000_000, batch_size=2000, batches_per_epoch=5),
     "pntfields_2d": Recipe(epochs=1000, n_pairs=500_000, batch_size=10_000, batches_per_epoch=6),
+    "td_ntfields_3d": Recipe(epochs=5000, n_pairs=1_000_000, batch_size=2000, batches_per_epoch=5),
+    "pntfields_3d": Recipe(epochs=1000, n_pairs=500_000, batch_size=10_000, batches_per_epoch=6),
 }
 
 
