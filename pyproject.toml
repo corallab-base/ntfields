@@ -14,6 +14,9 @@ dependencies = [
 arm = ["pytorch-kinematics>=0.7"]
 cli = ["tyro>=0.9"]
 gt = ["scikit-fmm>=2024.5.29"]
+viz = [
+    "viser>=1.1.1",
+]
 
 [project.scripts]
 ntfields = "ntfields.cli:main"
@@ -24,9 +27,11 @@ dev = [
     "pyright>=1.1.400",
     "pytest>=8.3",
     "pytorch-kinematics>=0.7",
+    "pyyaml>=6.0.3",
     "ruff>=0.14",
     "scikit-fmm>=2024.5.29",
     "tyro>=0.9",
+    "viser>=1.1.1",
 ]
 
 [build-system]

@@ -148,6 +148,17 @@ results. Planners come from `ntfields.plan`; external ones register through the 
 `--planners all` also runs every method with every planner. Trained checkpoints go to `benchmarks/checkpoints/`
 (not committed); rerunning with the same config and recipe evaluates them instead of retraining.
 
+### Challenge pairs
+`challenge %` is success on pairs whose straight line is blocked, so a query that needs no planning cannot flatter it.
+`box2d-v1` and `box3d-v1` hold 200 such pairs per problem, beside `suite.json` so that their released pairs and records
+stay valid; `empty` has none. Every test pair of `ur5e-mbm-v1` needs a detour, so there it equals the success rate.
+`ntfields bench challenge --records <files>` adds the metric to existing records from their checkpoints.
+
+### Viewer
+`ntfields viz --suite ur5e-mbm-v1` (needs `ntfields[viz]`) opens a browser UI on port 8080: scenes as true geometry,
+oracle boxes or point clouds; the arm as collision spheres or meshes; tested pairs with their recorded results; online
+planning from a checkpoint, judged as the benchmark judges it; custom queries; and a T heatmap for 2D and 3D scenes.
+
 ### Results: `box2d-v1`
 
 SPL on the test split, mean over seeds 0–2, with each method's reference recipe. The last three columns are over

@@ -61,10 +61,19 @@ def _to_spec(obj: object) -> dict[str, Any]:
     cls = type(obj)
     return {
         "type": f"{cls.__module__}:{cls.__qualname__}",
-        "fields": {f.name: getattr(obj, f.name) for f in fields(obj) if f.init},
+        "fields": {f.name: _pack(getattr(obj, f.name)) for f in fields(obj) if f.init},
     }
+
+
+def _pack(value: Any) -> Any:
+    """Dataclass fields, such as an arm's scene, become specs: a weights-only load refuses custom classes."""
+    return _to_spec(value) if is_dataclass(value) and not isinstance(value, type) else value
+
+
+def _unpack(value: Any) -> Any:
+    return _from_spec(value) if isinstance(value, dict) and value.keys() == {"type", "fields"} else value
 
 
 def _from_spec(spec: dict[str, Any]) -> Any:
     module, name = spec["type"].split(":")
-    return getattr(import_module(module), name)(**spec["fields"])
+    return getattr(import_module(module), name)(**{k: _unpack(v) for k, v in spec["fields"].items()})

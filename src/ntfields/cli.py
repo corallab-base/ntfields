@@ -48,6 +48,10 @@ def main(args: Sequence[str] | None = None) -> None:
         from ntfields.bench.cli import main as bench
 
         return bench(argv[1:])
+    if argv[:1] == ["viz"]:
+        from ntfields.viz.app import main as viz
+
+        return viz(argv[1:])
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     names = available()
     defaults = {name: default_config(name) for name in names}
