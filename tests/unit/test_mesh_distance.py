@@ -9,6 +9,12 @@ def _unit_square() -> torch.Tensor:
     return v[torch.tensor([[0, 1, 2], [0, 2, 3]])]
 
 
+def test_zero_area_triangles_only_count_by_their_edges():
+    degenerate = torch.tensor([[[0.0, 0, 0], [1, 0, 0], [2, 0, 0]]], dtype=torch.float64)
+    p = torch.tensor([[1.0, 3, 0], [4.0, 0, 0]], dtype=torch.float64)
+    torch.testing.assert_close(point_triangle_distance(p, degenerate), torch.tensor([3.0, 2.0], dtype=torch.float64))
+
+
 def test_point_triangle_distance_regions():
     tri = torch.tensor([[[0.0, 0, 0], [1, 0, 0], [0, 1, 0]]], dtype=torch.float64)
     p = torch.tensor([[0.2, 0.2, 0.5], [-1, -1, 0], [2, 0, 1], [0.5, 0.5, 0], [0.6, 0.6, 0.1], [0.5, -2, 0]])

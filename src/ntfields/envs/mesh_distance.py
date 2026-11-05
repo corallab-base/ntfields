@@ -10,7 +10,9 @@ def point_triangle_distance(p: Tensor, triangles: Tensor, chunk: int = 2048) -> 
     """Exact unsigned distance from points p (N, 3) to the nearest of `triangles` (T, 3, 3)."""
     a, b, c = triangles.to(p).unbind(1)  # (T, 3) each
     n = torch.linalg.cross(b - a, c - a)
-    n = n / n.norm(dim=-1, keepdim=True).clamp_min(1e-12)
+    area = n.norm(dim=-1, keepdim=True)
+    n = n / area.clamp_min(1e-12)
+    solid = area[:, 0] > 0  # a zero-area triangle has no interior; its edges below still count
     edges = ((a, b), (b, c), (c, a))
     out = []
     for q in p.split(chunk):
@@ -19,7 +21,7 @@ def point_triangle_distance(p: Tensor, triangles: Tensor, chunk: int = 2048) -> 
         h = (ap * n).sum(-1)  # signed height above the plane
         foot = q - h[..., None] * n
         # the foot of the perpendicular is inside iff it is on the inner side of all three edges
-        inside = torch.ones_like(h, dtype=torch.bool)
+        inside = solid.expand_as(h).clone()
         for u, v in edges:
             inside &= (torch.linalg.cross((v - u).expand_as(foot), foot - u) * n).sum(-1) >= 0
         d2 = torch.where(inside, h * h, torch.full_like(h, torch.inf))
