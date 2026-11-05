@@ -1,0 +1,22 @@
+{
+  "seed": 2000,
+  "rule": "the straight line fails the protocol; the FMM path passes it",
+  "files": {
+    "one_sphere": {
+      "path": "challenge/one_sphere.json",
+      "sha256": "c11b8b997286fdc27f32508d0f1aebbfb449e0926b4dcbc85d5ec1cfb114f0c9"
+    },
+    "clutter": {
+      "path": "challenge/clutter.json",
+      "sha256": "92e92d06e54055b8becc73c0a87b2428a1c91d025719f04ce595057ca01a51d2"
+    },
+    "walls": {
+      "path": "challenge/walls.json",
+      "sha256": "8f910e4bb64608665819635c311979a157cee07f2a5bef983ea9295729feae3a"
+    },
+    "thick_walls": {
+      "path": "challenge/thick_walls.json",
+      "sha256": "ece238216e9ae2fc6c3c045b06bed57020227b4941d7dda29c53af9e968ddb29"
+    }
+  }
+}

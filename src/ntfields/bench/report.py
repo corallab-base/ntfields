@@ -10,6 +10,7 @@ Metric = tuple[str, Callable[[Record], float | None], float, str]  # header, val
 
 METRICS: list[Metric] = [
     ("success %", lambda r: r.success_rate, 100, ".1f"),
+    ("challenge %", lambda r: r.challenge_success_rate, 100, ".1f"),
     ("SPL", lambda r: r.spl, 1, ".3f"),
     ("cost ratio", lambda r: r.cost_ratio_mean, 1, ".3f"),
     ("T error %", lambda r: r.t_error_mean, 100, ".1f"),
@@ -56,6 +57,7 @@ def _per_seed(records: list[Record]) -> list[Record]:
         merged.append(Record(**{
             **vars(first),
             "success_rate": statistics.fmean(r.success_rate for r in rs),
+            "challenge_success_rate": _mean_known([r.challenge_success_rate for r in rs]),
             "spl": _mean([r.spl for r in rs]),
             "cost_ratio_mean": _mean([r.cost_ratio_mean for r in rs]),
             "t_error_mean": _mean([r.t_error_mean for r in rs]),
@@ -67,6 +69,12 @@ def _per_seed(records: list[Record]) -> list[Record]:
 
 def _mean(values: list[float | None]) -> float | None:
     return None if any(v is None for v in values) else statistics.fmean(v for v in values if v is not None)
+
+
+def _mean_known(values: list[float | None]) -> float | None:
+    """The mean over the problems that have a value: a problem like `empty` can have no challenge pairs."""
+    known = [v for v in values if v is not None]
+    return statistics.fmean(known) if known else None
 
 
 def _cell(values: list[float | None], scale: float, fmt: str) -> str:
@@ -107,6 +115,11 @@ def validate(records: Sequence[Record], suites_dir: Path = DEFAULT_ROOT) -> list
             continue
         if r.n != n or any(len(x) != n for x in (r.success, r.cost, r.length, r.plan_seconds)):
             errors.append(f"{where}: per-query results do not cover the {n} queries")
+        challenge = suite.get(r.problem).challenge
+        if r.challenge_success and (challenge is None or len(r.challenge_success) != len(challenge)):
+            errors.append(f"{where}: challenge results do not cover the suite's challenge pairs")
+        if r.challenge_success and r.challenge_sha256 != suite.challenge_sha256:
+            errors.append(f"{where}: challenge checksum differs from {suite.id}'s challenge.json")
     for (suite_id, entry), rs in entries.items():
         suite = suites.get(suite_id)
         if suite is None:

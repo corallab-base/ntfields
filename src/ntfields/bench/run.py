@@ -16,8 +16,8 @@ import ntfields
 from ntfields.base import Method, TrainState
 from ntfields.bench.protocol import evaluate_path, percentile, spl
 from ntfields.bench.recipes import get_recipe
-from ntfields.bench.schema import Record, append_records
-from ntfields.bench.suite import DEFAULT_ROOT, Suite, SuiteProblem, load_suite, sha256
+from ntfields.bench.schema import Record, append_records, read_records
+from ntfields.bench.suite import DEFAULT_ROOT, Queries, Suite, SuiteProblem, load_suite, sha256
 from ntfields.checkpoint import load, save
 from ntfields.field import TrainedField
 from ntfields.plan import PLANNERS
@@ -26,6 +26,8 @@ from ntfields.registry import create
 from ntfields.train import Callback
 
 log = logging.getLogger(__name__)
+
+CHALLENGE_SEED_OFFSET = 500_000
 
 
 @dataclass
@@ -104,6 +106,14 @@ def evaluate(
         if queries.c_star is not None:
             scores.append(spl(outcome.success, outcome.cost, float(queries.c_star[i])))
 
+    if sp.challenge is not None:
+        challenge = challenge_successes(trained, suite, sp.challenge, planner, seed, cfg.device)
+        challenge_rate = statistics.fmean(challenge)
+    else:
+        challenge = []  # with no straight-line pairs among the queries, they are the challenge set
+        all_detours = queries.straight_free is not None and not queries.straight_free.any()
+        challenge_rate = statistics.fmean(success) if all_detours else None
+
     ok = [i for i, s in enumerate(success) if s]
     ratios = [cost[i] / float(queries.c_star[i]) for i in ok if queries.c_star is not None]  # pyright: ignore[reportOptionalOperand]
     method = trained.method
@@ -146,8 +156,47 @@ def evaluate(
         length=length,
         plan_seconds=seconds,
         self_collision=suite.protocol.self_collision,
+        challenge_success_rate=challenge_rate,
+        challenge_sha256=suite.challenge_sha256 if challenge else None,
+        challenge_success=challenge,
         **training,
     )
+
+
+def challenge_successes(
+    trained: TrainedField, suite: Suite, queries: Queries, planner: str, seed: int, device: str
+) -> list[bool]:
+    """Whether each challenge pair is solved; judged as any path is, with the seeds of `evaluate` offset from the test
+    queries'."""
+    problem, out = trained.problem, []
+    for i, (s, g) in enumerate(zip(queries.start.to(device), queries.goal.to(device), strict=True)):
+        torch.manual_seed(seed * 1_000_003 + CHALLENGE_SEED_OFFSET + i)
+        out.append(evaluate_path(problem, suite.protocol, s, g, trained.plan(s, g, planner).path).success)
+    return out
+
+
+def backfill_challenge(path: Path, suites_dir: Path = DEFAULT_ROOT, device: str = "cuda") -> int:
+    """Add the challenge metric to a record file from each record's checkpoint, in place, changing nothing else. Skips
+    records that have it, or whose suite, challenge pairs or checkpoint are missing. Returns the records updated."""
+    records = read_records(path)
+    updated = 0
+    for r in records:
+        suite = load_suite(r.suite_id, suites_dir)
+        pairs = suite.get(r.problem).challenge
+        if r.challenge_success or pairs is None or not r.checkpoint or not Path(r.checkpoint).exists():
+            continue
+        if sha256(Path(r.checkpoint)) != r.checkpoint_sha256:
+            log.warning("%s: checkpoint changed since the record was written; skipped", r.checkpoint)
+            continue
+        protocol = replace(suite.protocol, self_collision=r.self_collision)
+        successes = challenge_successes(load(Path(r.checkpoint), device), replace(suite, protocol=protocol), pairs,
+                                        r.planner, r.seed, device)  # fmt: skip
+        r.challenge_success, r.challenge_success_rate = successes, statistics.fmean(successes)
+        r.challenge_sha256 = suite.challenge_sha256
+        updated += 1
+        path.write_text("".join(x.to_json() + "\n" for x in records))
+        log.info("%s %s %s seed %d: challenge %.3f", r.suite_id, r.problem, r.entry, r.seed, r.challenge_success_rate)
+    return updated
 
 
 def _field(

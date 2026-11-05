@@ -16,6 +16,7 @@ from ntfields.speed import Clipped, ClippedEased, Smoothstep
 
 FORMAT_VERSION = 1
 SPLITS = ("dev", "test")
+CHALLENGE = "challenge.json"
 DEFAULT_ROOT = Path("benchmarks/suites")
 
 
@@ -62,6 +63,7 @@ class SuiteProblem:
     scene: dict[str, Any]  # the scene as data (scenes/<name>.json)
     speed: dict[str, Any]  # {"kind": ..., **params}
     queries: dict[str, Queries]  # by split
+    challenge: Queries | None = None  # pairs that need a detour, where the suite has them
 
     def problem(self) -> Problem:
         return Problem(build_env(self.scene), build_speed(self.speed))
@@ -77,6 +79,7 @@ class Suite:
     protocol: Protocol
     problems: list[SuiteProblem]
     sha256: str  # of suite.json, which holds the checksums of every other file
+    challenge_sha256: str | None = None  # of challenge.json, kept apart so that records against suite.json stay valid
 
     @property
     def id(self) -> str:
@@ -134,4 +137,22 @@ def load_suite(name: str, root: Path = DEFAULT_ROOT) -> Suite:
         scene = json.loads((base / p["scene"]).read_text())
         problems.append(SuiteProblem(p["name"], scene, p["speed"], {s: Queries.from_json(queries[s]) for s in SPLITS}))
     return Suite(meta["name"], meta["version"], meta["description"], meta["leaderboard"], meta["min_seeds"],
-                 Protocol(**meta["protocol"]), problems, sha256(meta_path))  # fmt: skip
+                 Protocol(**meta["protocol"]), problems, sha256(meta_path),
+                 _load_challenge(name, base, problems))  # fmt: skip
+
+
+def _load_challenge(name: str, base: Path, problems: list[SuiteProblem]) -> str | None:
+    """Attach challenge.json's query sets to `problems`, verifying them, and return its checksum (None without one)."""
+    path = base / CHALLENGE
+    if not path.exists():
+        return None
+    meta = json.loads(path.read_text())
+    for p in problems:
+        rel = meta["files"].get(p.name)
+        if rel is None:
+            continue
+        file = base / rel["path"]
+        if not file.exists() or sha256(file) != rel["sha256"]:
+            raise SuiteIntegrityError(f"{name}: {rel['path']} is missing or does not match its checksum")
+        p.challenge = Queries.from_json(json.loads(file.read_text()))
+    return sha256(path)

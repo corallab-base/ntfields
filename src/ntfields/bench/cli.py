@@ -7,7 +7,7 @@ from pathlib import Path
 import tyro
 
 from ntfields.bench.report import reference_check, report, validate
-from ntfields.bench.run import RunConfig, run_suite
+from ntfields.bench.run import RunConfig, backfill_challenge, run_suite
 from ntfields.bench.schema import read_records
 from ntfields.bench.suite import DEFAULT_ROOT, available_suites, load_suite
 
@@ -33,6 +33,15 @@ class Report:
 
 
 @dataclass
+class Challenge:
+    """Add the challenge metric to record files from their checkpoints, without training."""
+
+    records: list[Path] = field(default_factory=list)
+    suites_dir: Path = DEFAULT_ROOT
+    device: str = "cuda"
+
+
+@dataclass
 class Validate:
     """Check record files against the released suites; exits 1 on any problem."""
 
@@ -43,7 +52,9 @@ class Validate:
 def main(args: Sequence[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     command = tyro.extras.subcommand_cli_from_dict(
-        {"list": List, "run": Run, "report": Report, "validate": Validate}, args=args, prog="ntfields bench"
+        {"list": List, "run": Run, "report": Report, "challenge": Challenge, "validate": Validate},
+        args=args,
+        prog="ntfields bench",
     )
     if isinstance(command, List):
         for name in available_suites(command.suites_dir):
@@ -52,6 +63,9 @@ def main(args: Sequence[str] | None = None) -> None:
             print(f"{suite.id}{'' if suite.leaderboard else ' [not ranked]'}: {suite.description} | {sizes}")
     elif isinstance(command, Run):
         run_suite(command)
+    elif isinstance(command, Challenge):
+        for path in command.records:
+            print(f"{path}: {backfill_challenge(path, command.suites_dir, command.device)} records updated")
     elif isinstance(command, Report):
         records = read_records(*command.records)
         print(report(records))

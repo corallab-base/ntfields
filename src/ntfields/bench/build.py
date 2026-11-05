@@ -7,7 +7,7 @@ import torch
 from torch import Tensor
 
 from ntfields.bench.protocol import Protocol, evaluate_path, is_valid
-from ntfields.bench.suite import FORMAT_VERSION, SPLITS, Queries, SuiteProblem, sha256
+from ntfields.bench.suite import CHALLENGE, FORMAT_VERSION, SPLITS, Queries, SuiteProblem, sha256
 from ntfields.problem import Problem
 
 log = logging.getLogger(__name__)
@@ -76,6 +76,32 @@ def build_suite(
     (base / "suite.json").write_text(json.dumps(meta, indent=2) + "\n")
 
 
+def build_challenge(base: Path, n: int, seed: int, skip: tuple[str, ...] = ()) -> None:
+    """Add detour-only pairs to the released suite in `base`, beside suite.json, which stays as it is so that records
+    made against it stay valid. Problems in `skip` can have no such pairs. Finished problems are kept, so that an
+    interrupted run resumes; challenge.json comes last."""
+    meta = json.loads((base / "suite.json").read_text())
+    protocol = Protocol(**meta["protocol"])
+    reference = meta["reference"]
+    (base / "challenge").mkdir(exist_ok=True)
+    files = {}
+    for index, p in enumerate(meta["problems"]):
+        if p["name"] in skip:
+            continue
+        path = base / "challenge" / f"{p['name']}.json"
+        if not path.exists():
+            scene = json.loads((base / p["scene"]).read_text())
+            problem = SuiteProblem(p["name"], scene, p["speed"], {}).problem()
+            generator = torch.Generator().manual_seed(seed + index)
+            queries = reference_queries(problem, protocol, n, reference["min_distance"], reference["resolution"],
+                                        generator, detour=True)  # fmt: skip
+            path.write_text(json.dumps(queries.to_json()) + "\n")
+            log.info("%s/%s: %d challenge pairs", base.name, p["name"], len(queries))
+        files[p["name"]] = {"path": str(path.relative_to(base)), "sha256": sha256(path)}
+    manifest = {"seed": seed, "rule": "the straight line fails the protocol; the FMM path passes it", "files": files}
+    (base / CHALLENGE).write_text(json.dumps(manifest, indent=2) + "\n")
+
+
 def reference_queries(
     problem: Problem,
     protocol: Protocol,
@@ -84,9 +110,11 @@ def reference_queries(
     fmm_resolution: int,
     generator: torch.Generator,
     max_tries: int = 100,
+    detour: bool = False,
 ) -> Queries:
     """n uniform (start, goal) pairs, both valid and at least `min_distance` apart, each kept only if the FMM path
-    between them passes the protocol; c* is that path's cost and t* the FMM travel time."""
+    between them passes the protocol; c* is that path's cost and t* the FMM travel time. With `detour`, only pairs
+    whose straight line fails the protocol are drawn."""
     from ntfields.gt import fmm_travel_time
 
     bounds = problem.env.bounds
@@ -99,6 +127,9 @@ def reference_queries(
         s, g = lo + (hi - lo) * torch.rand(2, problem.dim, generator=generator)
         if (s - g).norm() < min_distance or not bool(is_valid(problem, torch.stack([s, g]), protocol.margin).all()):
             continue
+        straight = evaluate_path(problem, protocol, s, g, torch.stack([s, g])).success
+        if detour and straight:
+            continue
         gt = fmm_travel_time(problem, g, fmm_resolution, margin=protocol.margin)
         t_star = float(gt.value(s[None])[0])
         path = gt.descend(s, step) if t_star < float("inf") else None
@@ -107,7 +138,6 @@ def reference_queries(
         outcome = evaluate_path(problem, protocol, s, g, path)
         if not outcome.success or outcome.cost is None:
             continue
-        straight = evaluate_path(problem, protocol, s, g, torch.stack([s, g])).success
         rows.append((s, g, outcome.cost, t_star, straight))
     if len(rows) < n:
         raise RuntimeError(f"found only {len(rows)} of {n} queries with a valid reference path")

@@ -20,10 +20,11 @@ from ntfields.bench import (
     spl,
     validate,
 )
-from ntfields.bench.build import build_suite, tunneling_share
+from ntfields.bench.build import build_challenge, build_suite, tunneling_share
 from ntfields.bench.cli import main as bench_main
 from ntfields.bench.protocol import densify
-from ntfields.bench.suite import Queries, SuiteProblem
+from ntfields.bench.run import backfill_challenge
+from ntfields.bench.suite import Queries, SuiteProblem, sha256
 from ntfields.field import TrainedField
 from ntfields.gt import fmm_travel_time
 from ntfields.methods.euclidean.method import Euclidean, EuclideanConfig, EuclideanModel
@@ -185,3 +186,76 @@ def test_tunneling_share_flags_thin_walls():
     start, goal = torch.tensor([[-0.5, 0.8]]), torch.tensor([[0.5, 0.8]])  # far from the gap: crossing is cheaper
     t_star = fmm_travel_time(problem, goal[0], 101, margin=0.01).value(start)
     assert tunneling_share(problem, Queries(start, goal, t_star=t_star.double()), 101, 0.02) == 1.0
+
+
+def _challenge_suite(tmp_path: Path) -> Path:
+    scene = {"kind": "sphere_box", "bounds": [[-1, 1]] * 2, "spheres": [{"center": [0.0, 0.0], "radius": 0.3}]}
+    empty = {"kind": "sphere_box", "bounds": [[-1, 1]] * 2}
+    speed = {"kind": "clipped", "dmin": 0.01, "dmax": 0.1}
+    build_suite(tmp_path, "c", 1, "challenge", {"one": scene, "empty": empty}, speed, PROTOCOL, {"dev": 1, "test": 2},
+                min_distance=0.5, fmm_resolution=51, seed=0, min_seeds=1)  # fmt: skip
+    return tmp_path / "c-v1"
+
+
+def test_challenge_pairs_need_a_detour_and_leave_suite_json_alone(tmp_path: Path):
+    base = _challenge_suite(tmp_path)
+    before = load_suite("c-v1", tmp_path).sha256
+    build_challenge(base, 3, seed=1, skip=("empty",))
+    suite = load_suite("c-v1", tmp_path)
+    assert suite.sha256 == before
+    assert suite.challenge_sha256 is not None
+    assert suite.get("empty").challenge is None
+    pairs = suite.get("one").challenge
+    assert pairs is not None and len(pairs) == 3
+    problem = suite.get("one").problem()
+    for s, g in zip(pairs.start, pairs.goal, strict=True):
+        assert not evaluate_path(problem, suite.protocol, s, g, torch.stack([s, g])).success
+    assert pairs.straight_free is not None and not pairs.straight_free.any()
+
+    file = base / "challenge" / "one.json"
+    file.write_text(file.read_text().replace("0.", "0.1", 1))
+    with pytest.raises(SuiteIntegrityError):
+        load_suite("c-v1", tmp_path)
+
+
+def test_challenge_metric_run_report_backfill_and_validate(tmp_path: Path):
+    base = _challenge_suite(tmp_path)
+    build_challenge(base, 3, seed=1, skip=("empty",))
+    out = tmp_path / "records.jsonl"
+    cfg = RunConfig("c-v1", ["euclidean"], seeds=[0], planners=["gradient_bidirectional"], out=out, suites_dir=tmp_path,
+                    checkpoint_dir=tmp_path / "ckpt", device="cpu", epochs=1, n_pairs=16)  # fmt: skip
+    records = {r.problem: r for r in run_suite(cfg)}
+    assert len(records["one"].challenge_success) == 3
+    assert records["one"].challenge_success_rate == sum(records["one"].challenge_success) / 3
+    assert records["empty"].challenge_success_rate is None
+    assert "challenge %" in report(list(records.values()))
+    assert validate(read_records(out), tmp_path) == []
+
+    rows = read_records(out)
+    for r in rows:
+        if r.problem == "one":
+            r.challenge_success, r.challenge_success_rate, r.challenge_sha256 = [], None, None
+    out.write_text("".join(r.to_json() + "\n" for r in rows))
+    before = [{k: v for k, v in vars(r).items() if "challenge" not in k} for r in read_records(out)]
+    assert backfill_challenge(out, tmp_path, "cpu") == 1
+    after = read_records(out)
+    assert [{k: v for k, v in vars(r).items() if "challenge" not in k} for r in after] == before
+    assert next(r for r in after if r.problem == "one").challenge_success == records["one"].challenge_success
+    assert backfill_challenge(out, tmp_path, "cpu") == 0
+
+
+def test_all_detour_suites_report_their_success_as_the_challenge(tmp_path: Path):
+    base = _challenge_suite(tmp_path)
+    path = base / "queries" / "one.json"
+    data = json.loads(path.read_text())
+    data["test"]["straight_free"] = [False, False]
+    path.write_text(json.dumps(data))
+    meta = json.loads((base / "suite.json").read_text())
+    meta["files"]["queries/one.json"] = sha256(path)
+    (base / "suite.json").write_text(json.dumps(meta))
+    cfg = RunConfig("c-v1", ["euclidean"], seeds=[0], planners=["gradient_bidirectional"], problems=["one"],
+                    out=tmp_path / "r.jsonl", suites_dir=tmp_path, checkpoint_dir=tmp_path / "ckpt", device="cpu",
+                    epochs=1, n_pairs=16)  # fmt: skip
+    record = run_suite(cfg)[0]
+    assert record.challenge_success_rate == record.success_rate
+    assert record.challenge_success == []
