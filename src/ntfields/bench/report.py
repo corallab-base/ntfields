@@ -19,14 +19,14 @@ METRICS: list[Metric] = [
 
 
 def report(records: Sequence[Record]) -> str:
-    """Markdown tables, one per (suite, split): a row per entry and problem plus an 'all' row averaging the problems,
-    each cell the mean ± std over seeds."""
-    groups: dict[tuple[str, str], list[Record]] = defaultdict(list)
+    """Markdown tables, one per (suite, split, self-collision setting): a row per entry and problem plus an 'all' row
+    averaging the problems, each cell the mean ± std over seeds."""
+    groups: dict[tuple[str, str, bool], list[Record]] = defaultdict(list)
     for r in records:
-        groups[r.suite_id, r.split].append(r)
+        groups[r.suite_id, r.split, r.self_collision].append(r)
     out = []
-    for (suite_id, split), rs in sorted(groups.items()):
-        out.append(f"### {suite_id} ({split})\n")
+    for (suite_id, split, self_collision), rs in sorted(groups.items()):
+        out.append(f"### {suite_id} ({split}{', with self-collision' if self_collision else ''})\n")
         out.append("| problem | entry | seeds | " + " | ".join(m[0] for m in METRICS) + " |")
         out.append("|---|---|---|" + "---|" * len(METRICS))
         problems = sorted({r.problem for r in rs})

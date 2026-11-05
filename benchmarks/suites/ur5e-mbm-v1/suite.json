@@ -1,0 +1,101 @@
+{
+  "format_version": 1,
+  "name": "ur5e-mbm",
+  "version": 1,
+  "description": "UR5e + 2F-85 in five nominal MotionBenchMaker scenes; RRT-solved queries, no optimal reference",
+  "leaderboard": true,
+  "min_seeds": 3,
+  "protocol": {
+    "margin": 0.005,
+    "resolution": 0.0025,
+    "endpoint_tol": 0.0001,
+    "reference_tol": 0.02,
+    "self_collision": false
+  },
+  "reference": {
+    "kind": "rrt",
+    "seed": 0,
+    "query_seed": 1000,
+    "min_distance": 0.25,
+    "mbm_commit": "f50542777f4d1ae013b0de430bafbf51fdbdc40e"
+  },
+  "problems": [
+    {
+      "name": "cage",
+      "scene": "scenes/cage.json",
+      "queries": "queries/cage.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.005,
+        "dmax": 0.05
+      }
+    },
+    {
+      "name": "bookshelf_tall",
+      "scene": "scenes/bookshelf_tall.json",
+      "queries": "queries/bookshelf_tall.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.005,
+        "dmax": 0.05
+      }
+    },
+    {
+      "name": "box",
+      "scene": "scenes/box.json",
+      "queries": "queries/box.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.005,
+        "dmax": 0.05
+      }
+    },
+    {
+      "name": "table_under_pick",
+      "scene": "scenes/table_under_pick.json",
+      "queries": "queries/table_under_pick.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.005,
+        "dmax": 0.05
+      }
+    },
+    {
+      "name": "kitchen",
+      "scene": "scenes/kitchen.json",
+      "queries": "queries/kitchen.json",
+      "speed": {
+        "kind": "clipped",
+        "dmin": 0.005,
+        "dmax": 0.05
+      }
+    }
+  ],
+  "files": {
+    "oracle/bookshelf_tall.json": "ca20c7d6b6806c997bbc55b82d6cd4278742eea53a9a3d88fbd5b9fbfde792cb",
+    "oracle/box.json": "1c5ac8d221aa18f1fde27b64d172c0ce77a4a03e029a43fa30bdd0851a55e552",
+    "oracle/cage.json": "136735aa3c232bc589f732aa9dae6eb20922ec6252e89b871d1c94035b237469",
+    "oracle/kitchen.json": "710ad64757d6b295c13e3f6c6efc5324834475284a101b69cb5b83a717e7647b",
+    "oracle/table_under_pick.json": "ac94b7007e3ec22f589c5ab42e67d0f235ccf5e6df530bc675261d8974a95705",
+    "points/bookshelf_tall_full.npy": "f7b290fe34fdffa9f45c08457a11fc43ea065f0a831b23aa4f255583391b6145",
+    "points/bookshelf_tall_sensed.npy": "52d83c13908de5e6204e92212776640b91eef62f6b8619910828f17ab4a0a5f3",
+    "points/box_full.npy": "ea3e8a40e5ab7867095d1fbf75425598891927d086e20710fea1c59d5c114d85",
+    "points/box_sensed.npy": "4250645ccf80d67362a22d1a1eeabecf02dc54a05bfdc298e9af105c79fd27a4",
+    "points/cage_full.npy": "c10dc89c104d22e3f531c4da8cca8aa20a02e59949655d33970d8793465dfefc",
+    "points/cage_sensed.npy": "f76a0a1fa91e64ba913ef9233cbed6f57f3b500ad22fc865f48b755f1c34b118",
+    "points/kitchen_full.npy": "789b91821f193d5ef709b381e38f76ffbc233e60563bed0e273967f0fc3e7bd8",
+    "points/kitchen_sensed.npy": "9d735c8fb811ddbf2323b5a47691c4f72b6b70edaa4fa746517febae0af96a8c",
+    "points/table_under_pick_full.npy": "e957c095c92cd52e49705415d665c724e2a1574639471537ddde2e45dcf17821",
+    "points/table_under_pick_sensed.npy": "36d786be4b479a00b578b72ffcb3541befb42b6dbc46d36034cf54d45873d51f",
+    "queries/bookshelf_tall.json": "5cf4a7ed2490ff450d104ada73b49770d2d06301b4a89822a2ede02e61fd2a73",
+    "queries/box.json": "91e296f53b9001941de98550fdbaddce539c0da18521d567caae29d779cccbc3",
+    "queries/cage.json": "4be8e57565f5deb710a5d208ed560302becce4664cc45f02f5a3472b81933d98",
+    "queries/kitchen.json": "f94bc2118812762ccd5e15a2389cb43a4e10bca8f2ef1761b3c2f7302665c4f1",
+    "queries/table_under_pick.json": "e2e0904ae00251973e5650204a93d32df7b38899e3b845adc487f18c1cad90cb",
+    "scenes/bookshelf_tall.json": "3de4fdb7c7bdfd0f108b27aff4bdc8e089495b40cbae36df9b1f01f87b6964af",
+    "scenes/box.json": "e29c2456489572169135c38a93e36ffc296522cd97498d436a66db0584cca0b1",
+    "scenes/cage.json": "db677285f7ed024ec1df564dab3a60ad0552a7d4812b64f904eddaa970011386",
+    "scenes/kitchen.json": "3a232c0b582e796ea69804c71311b5656573eb5247c29454dbece1915a8c8cf1",
+    "scenes/table_under_pick.json": "196103880f92d95995af67ea696a7364b393b0a5e01be17fc7b31d5ffbd40109"
+  }
+}

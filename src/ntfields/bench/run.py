@@ -44,10 +44,13 @@ class RunConfig:
     epochs: int | None = None  # override every recipe (smoke tests)
     n_pairs: int | None = None
     submitter: str | None = None
+    self_collision: bool = False  # also reject paths in self-collision; records say so
 
 
 def run_suite(cfg: RunConfig) -> list[Record]:
     suite = load_suite(cfg.suite, cfg.suites_dir)
+    if cfg.self_collision:
+        suite = replace(suite, protocol=replace(suite.protocol, self_collision=True))
     out = cfg.out or Path("results") / f"{suite.id}.jsonl"
     records = []
     for sp in [suite.get(p) for p in cfg.problems] if cfg.problems else suite.problems:
@@ -142,6 +145,7 @@ def evaluate(
         cost=cost,
         length=length,
         plan_seconds=seconds,
+        self_collision=suite.protocol.self_collision,
         **training,
     )
 

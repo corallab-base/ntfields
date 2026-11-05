@@ -9,7 +9,8 @@ from torch import Tensor
 
 from ntfields.base import Environment, SpeedModel
 from ntfields.bench.protocol import Protocol
-from ntfields.envs import SphereBoxEnv
+from ntfields.envs import ArmEnv, SphereBoxEnv
+from ntfields.envs.solids import SolidScene
 from ntfields.problem import Problem
 from ntfields.speed import Clipped, ClippedEased, Smoothstep
 
@@ -29,6 +30,7 @@ class Queries:
     c_star: Tensor | None = None  # (N,) cost of a near-optimal reference path, where a reference exists
     t_star: Tensor | None = None  # (N,) reference travel time
     straight_free: Tensor | None = None  # (N,) bool: the straight segment is already valid
+    kind: list[str] | None = None  # per query, where a suite mixes kinds ("task", "uniform")
 
     def __len__(self) -> int:
         return self.start.shape[0]
@@ -39,6 +41,8 @@ class Queries:
             value = getattr(self, name)
             if value is not None:
                 out[name] = value.tolist()
+        if self.kind is not None:
+            out["kind"] = self.kind
         return out
 
     @classmethod
@@ -49,7 +53,7 @@ class Queries:
         start, goal = tensor("start", torch.float32), tensor("goal", torch.float32)
         assert start is not None and goal is not None
         return cls(start, goal, tensor("c_star", torch.float64), tensor("t_star", torch.float64),
-                   tensor("straight_free", torch.bool))  # fmt: skip
+                   tensor("straight_free", torch.bool), data.get("kind"))  # fmt: skip
 
 
 @dataclass
@@ -92,6 +96,8 @@ def build_env(scene: dict[str, Any]) -> Environment:
             spheres=[(s["center"], s["radius"]) for s in scene.get("spheres", [])],
             boxes=[(b["center"], b["size"]) for b in scene.get("boxes", [])],
         )
+    if scene["kind"] == "arm" and scene["robot"] == "ur5e_2f85":
+        return ArmEnv.ur5e_2f85(SolidScene.from_json(scene["objects"]))
     raise ValueError(f"unknown scene kind {scene['kind']!r}")
 
 

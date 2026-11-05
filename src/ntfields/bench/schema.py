@@ -57,6 +57,7 @@ class Record:
     cost_ratio_mean: float | None = None
     plan_seconds_mean: float = 0.0
     plan_seconds_p95: float = 0.0
+    self_collision: bool = False  # whether self-collision counted against success
     success: list[bool] = field(default_factory=list)
     converged: list[bool] = field(default_factory=list)  # the planner's own flag; not used for success
     cost: list[float | None] = field(default_factory=list)

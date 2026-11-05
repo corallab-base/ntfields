@@ -1,3 +1,4 @@
+import json
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -9,8 +10,10 @@ from torch import Tensor
 
 from ntfields.base import SceneCondition
 from ntfields.envs.mesh_distance import MeshDistance
+from ntfields.envs.solids import SolidScene
 
 UR5E = Path(__file__).parents[1] / "assets" / "ur5e"
+UR5E_2F85 = Path(__file__).parents[1] / "assets" / "ur5e_2f85"
 UR5E_LINKS = ("shoulder_link", "upper_arm_link", "forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link")
 
 
@@ -55,6 +58,8 @@ class ArmEnv:
     clearance_offset: float = 0.0
     chunk: int = 512  # configurations per distance chunk (memory: chunk x spheres x points)
     mesh: MeshDistance | None = None  # unsigned distance to a triangle mesh
+    solids: SolidScene | None = None  # signed distance to solid primitives and closed meshes
+    self_ignore: tuple[tuple[str, str], ...] = ()  # link pairs left out of `self_distance`
     _chains: dict[str, Any] = field(default_factory=dict, init=False, repr=False)
 
     @classmethod
@@ -82,6 +87,24 @@ class ArmEnv:
         """ntrl-demo's UR5 setup: its scanned lab scene and a 0.01 m clearance offset."""
         points = torch.from_numpy(np.load(UR5E / "ntrl_scene_points.npy"))
         return cls.ur5e(points=points, clearance_offset=0.01)
+
+    @classmethod
+    def ur5e_2f85(cls, solids: SolidScene | None = None) -> Self:
+        """UR5e with a rigid, open Robotiq 2F-85 on wrist_3_link, q = θ / 2π in [-0.5, 0.5]^6 (all joints ±π)."""
+        pairs = json.loads((UR5E_2F85 / "self_ignore.json").read_text())
+        spheres = {k: torch.from_numpy(np.load(UR5E_2F85 / "spheres" / f"{k}.npy")).float() for k in UR5E_LINKS}
+        return cls(
+            urdf=(UR5E / "ur5e.urdf").read_text(),
+            end_link="wrist_3_link",
+            link_spheres=spheres,
+            bounds=torch.tensor([[-0.5, 0.5]] * 6),
+            points=torch.zeros(0, 3),
+            sphere_centers=torch.zeros(0, 3),
+            sphere_radii=torch.zeros(0),
+            solids=solids,
+            self_ignore=tuple((a, b) for a, b in pairs),
+            chunk=4096,
+        )
 
     @property
     def dim(self) -> int:
@@ -114,7 +137,24 @@ class ArmEnv:
             gaps.append(d.amin(dim=-1))
         if self.mesh is not None:
             gaps.append(self.mesh(centers.reshape(-1, 3)).view(centers.shape[:2]))
+        if self.solids is not None:
+            gaps.append(self.solids(centers.reshape(-1, 3)).view(centers.shape[:2]))
         return (torch.stack(gaps).amin(dim=0) - radii).amin(dim=-1)
+
+    def self_distance(self, q: Tensor) -> Tensor:
+        """The smallest gap (B,) between spheres on different links, leaving out `self_ignore`."""
+        ignored = {frozenset(p) for p in self.self_ignore}
+        owner = [k for k, s in self.link_spheres.items() for _ in range(len(s))]
+        i, j = torch.triu_indices(len(owner), len(owner), offset=1).tolist()
+        keep = [(a, b) for a, b in zip(i, j, strict=True)
+                if owner[a] != owner[b] and frozenset((owner[a], owner[b])) not in ignored]  # fmt: skip
+        first, second = torch.tensor(keep, device=q.device).T
+        out = []
+        for c in q.split(self.chunk):
+            centers, radii = self.arm_spheres(c)
+            gap = (centers[:, first] - centers[:, second]).norm(dim=-1) - radii[first] - radii[second]
+            out.append(gap.amin(dim=-1))
+        return torch.cat(out)
 
     def in_bounds(self, q: Tensor) -> Tensor:
         b = self.bounds.to(q)

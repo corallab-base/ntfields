@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import torch
 from torch import Tensor
 
+from ntfields.envs import ArmEnv
 from ntfields.problem import Problem
 
 
@@ -15,6 +16,7 @@ class Protocol:
     resolution: float  # paths are checked and costed on segments at most this long
     endpoint_tol: float = 1e-4  # the path must start at the start and end at the goal within this distance
     reference_tol: float = 0.02  # an entry beating the reference cost c* by more than this fraction flags the reference
+    self_collision: bool = False  # also reject self-collision; chosen per evaluation, and never part of S*
 
 
 @dataclass
@@ -24,10 +26,16 @@ class Outcome:
     length: float | None
 
 
-def is_valid(problem: Problem, q: Tensor, margin: float) -> Tensor:
+def is_valid(problem: Problem, q: Tensor, margin: float, self_collision: bool = False) -> Tensor:
     b = problem.env.bounds.to(q)
     inside = ((q >= b[:, 0]) & (q <= b[:, 1])).all(dim=-1)
-    return inside & (problem.env.distance(q) > margin)
+    valid = inside & (problem.env.distance(q) > margin)
+    if not self_collision:
+        return valid
+    env = problem.env
+    if not isinstance(env, ArmEnv):
+        raise ValueError(f"self-collision needs an arm; this environment is a {type(env).__name__}")
+    return valid & (env.self_distance(q) > margin)
 
 
 def densify(path: Tensor, resolution: float) -> Tensor:
@@ -50,7 +58,7 @@ def evaluate_path(problem: Problem, protocol: Protocol, start: Tensor, goal: Ten
     if not ends_ok or not torch.isfinite(path).all():
         return Outcome(False, None, None)
     dense = densify(path, protocol.resolution)
-    if not bool(is_valid(problem, dense, protocol.margin).all()):
+    if not bool(is_valid(problem, dense, protocol.margin, protocol.self_collision).all()):
         return Outcome(False, None, None)
     seg = dense.diff(dim=0)
     speed = problem.speed_at((dense[:-1] + seg / 2).float()).double()
