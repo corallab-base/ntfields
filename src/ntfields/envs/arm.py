@@ -10,7 +10,7 @@ from torch import Tensor
 from ntfields.base import SceneCondition
 from ntfields.envs.mesh_distance import MeshDistance
 
-UR5E = Path(__file__).parents[1] / "resources" / "ur5e"
+UR5E = Path(__file__).parents[1] / "assets" / "ur5e"
 UR5E_LINKS = ("shoulder_link", "upper_arm_link", "forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link")
 
 
