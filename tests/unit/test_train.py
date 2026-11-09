@@ -76,7 +76,7 @@ def test_micro_batches_give_the_full_batch_gradient(problem: Problem):
     from ntfields.methods.pntfields import PNTFields, PNTFieldsConfig
 
     pairs = sample_pairs(problem, 96)
-    data = PairDataset(*(getattr(pairs, f.name).double() for f in fields(pairs)))
+    data = PairDataset(*(getattr(pairs, f.name).double() for f in fields(pairs) if f.name != "extras"))
     states = []
     for micro in (None, 40):
         method = PNTFields(PNTFieldsConfig(hidden=16))

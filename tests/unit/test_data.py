@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 import torch
 
 from ntfields import Problem, SceneCondition
@@ -52,3 +53,25 @@ def test_surface_samplers_without_obstacles_sample_uniformly():
     for anchor in ("project", "reject"):
         q_s, q_g = SurfaceMix(anchor=anchor).sample(problem, 200, torch.Generator().manual_seed(0))
         assert q_s.shape == (200, 2) and torch.isfinite(torch.cat([q_s, q_g])).all()
+
+
+def test_extras_follow_their_pairs(problem: Problem, tmp_path: Path):
+    """Extras stay row-aligned through indexing, shuffled batches, micro-batches and an h5 round trip."""
+    from ntfields.train.trainer import _split
+
+    data = sample_pairs(problem, 50)
+    data = PairDataset(
+        *(getattr(data, f) for f in ("q_s", "q_g", "speed_s", "speed_g", "normal_s", "normal_g")),
+        extras={"tag": data.q_s.sum(-1, keepdim=True), "id": torch.arange(50)},
+    )
+    for batch in data.batches(16, SceneCondition(), torch.Generator().manual_seed(0)):
+        torch.testing.assert_close(batch.extras["tag"], batch.q_s.sum(-1, keepdim=True))
+        for part in _split(batch, 5):
+            torch.testing.assert_close(part.extras["tag"], part.q_s.sum(-1, keepdim=True))
+            assert len(part.extras["id"]) == len(part.q_s)
+    data.save(tmp_path / "pairs.h5")
+    loaded = PairDataset.load(tmp_path / "pairs.h5")
+    assert loaded.extras.keys() == data.extras.keys()
+    torch.testing.assert_close(loaded.extras["id"], data.extras["id"])
+    with pytest.raises(ValueError):
+        PairDataset(data.q_s, data.q_g, data.speed_s, data.speed_g, data.normal_s, data.normal_g, {"x": torch.zeros(3)})
