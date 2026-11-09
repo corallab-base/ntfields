@@ -40,6 +40,7 @@ class Batch:
     normal_s: Tensor  # (B, dim) unit clearance gradient ∇d/‖∇d‖ (0 where undefined)
     normal_g: Tensor
     scene: SceneCondition
+    extras: dict[str, Tensor] = field(default_factory=dict)  # a PairDataset's extras for these pairs
 
 
 @dataclass
