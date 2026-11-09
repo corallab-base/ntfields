@@ -76,5 +76,9 @@ def _run_epoch(method: Method[Any], state: TrainState, batches: Iterable[Batch],
 def _split(batch: Batch, size: int) -> list[Batch]:
     if size >= len(batch.q_s):
         return [batch]
-    parts = {f.name: getattr(batch, f.name).split(size) for f in fields(batch) if f.name != "scene"}
-    return [Batch(**{k: v[i] for k, v in parts.items()}, scene=batch.scene) for i in range(len(parts["q_s"]))]
+    parts = {f.name: getattr(batch, f.name).split(size) for f in fields(batch) if f.name not in ("scene", "extras")}
+    extras = {k: v.split(size) for k, v in batch.extras.items()}
+    return [
+        Batch(**{k: v[i] for k, v in parts.items()}, scene=batch.scene, extras={k: v[i] for k, v in extras.items()})
+        for i in range(len(parts["q_s"]))
+    ]
