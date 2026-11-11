@@ -103,6 +103,23 @@ def test_zero_loss_is_accepted_and_keeps_the_loss_scale():
         assert state.loss_scale == pytest.approx(4.0)  # still from the last nonzero epoch: 4 / (2 · 0.5)
 
 
+def test_lone_nan_at_the_retry_cap_does_not_stop_training():
+    model = Euclidean(EuclideanConfig()).build_model(None)  # pyright: ignore[reportArgumentType]
+    state = ntfields.TrainState(model, torch.optim.SGD(model.parameters(), lr=0.1))
+    rollback = LossRatioRollback(1.2, max_retries=3)
+    rollback.on_epoch_start(state)
+    state.loss = 0.5
+    rollback.on_epoch_end(state)
+    rollback.on_epoch_start(state)
+    for loss in (2.0, 2.0, float("nan")):  # the last retry is the one to go NaN
+        state.loss, state.retry = loss, False
+        rollback.on_epoch_end(state)
+        assert state.retry and not state.stop
+    state.loss, state.retry = 2.0, False  # the next finite loss is accepted, as at the cap
+    rollback.on_epoch_end(state)
+    assert not state.retry and rollback.retries == 0 and rollback.nonfinite == 0
+
+
 def test_diverged_loss_stops_at_the_last_accepted_state():
     model = Euclidean(EuclideanConfig()).build_model(None)  # pyright: ignore[reportArgumentType]
     state = ntfields.TrainState(model, torch.optim.SGD(model.parameters(), lr=0.1))

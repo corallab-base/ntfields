@@ -6,9 +6,13 @@ import torch
 import ntfields
 from ntfields import Problem, TrainConfig
 from ntfields.cli import main
+from ntfields.envs import ConstrainedEnv, SphereBoxEnv, SphereConstraint
 from ntfields.eval import is_collision_free, travel_time_error
+from ntfields.eval.constrained import evaluate_constrained
 from ntfields.gt import fmm_travel_time
+from ntfields.methods.cntfields import CNTFieldsConfig
 from ntfields.methods.euclidean import Euclidean
+from ntfields.speed import GaussianBand
 from ntfields.testing import check_method
 
 
@@ -36,3 +40,18 @@ def test_cli_train(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     main([*args, "--train.out-dir", str(tmp_path)])
     assert "checkpoint:" in capsys.readouterr().out
     assert list(tmp_path.glob("euclidean/*/ckpt.pt"))
+
+
+def test_cntfields_tangent_planner_stays_on_a_sphere() -> None:
+    """A short CPU run: the fronts meet along the surface, well within the tolerance."""
+    env = ConstrainedEnv(SphereBoxEnv.build([(-0.6, 0.6)] * 3), SphereConstraint(), epsilon=0.25, tolerance=0.1)
+    problem = Problem(env, GaussianBand(epsilon=0.25))
+    cfg = CNTFieldsConfig(hidden=32, fourier_features=16)
+    train_cfg = TrainConfig(n_pairs=4000, batch_size=500, device="cpu", out_dir=None)
+    field = ntfields.train("cntfields", problem, ntfields.Epochs(60), cfg, train_cfg)
+    generator = torch.Generator().manual_seed(0)
+    starts = torch.nn.functional.normalize(torch.randn(10, 3, generator=generator), dim=-1) * 0.4
+    goals = torch.nn.functional.normalize(torch.randn(10, 3, generator=generator), dim=-1) * 0.4
+    result = evaluate_constrained(field, starts, goals, beta=0.01, goal_tol=0.03, max_steps=200, tangent=True)
+    assert result["success"] >= 0.8
+    assert result["margin_max"] < 0.05

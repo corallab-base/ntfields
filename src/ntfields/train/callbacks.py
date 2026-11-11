@@ -33,6 +33,7 @@ class LossRatioRollback(Callback):
         self.queue: deque[dict[str, Any]] = deque(maxlen=queue_size)
         self.prev_loss = 1000.0
         self.retries = 0
+        self.nonfinite = 0  # of this stall's retries
         self._current: dict[str, Any] | None = None
         self._rng = random.Random(seed)
 
@@ -49,14 +50,17 @@ class LossRatioRollback(Callback):
     def on_epoch_end(self, state: TrainState) -> None:
         ratio = state.loss / self.prev_loss if self.prev_loss else math.inf
         if state.loss != 0 and not 0 < ratio < self.threshold:  # an exactly zero loss is never a divergence
+            finite = math.isfinite(state.loss)
             self.retries += 1
-            if self.retries < self.max_retries:
+            self.nonfinite += not finite
+            # a lone NaN at the cap is not divergence: only max_retries of them stop training
+            if self.retries < self.max_retries or (not finite and self.nonfinite < self.max_retries):
                 snapshot = self._rng.choice(self.queue)
                 state.model.load_state_dict(snapshot["model"])
                 state.optimizer.load_state_dict(snapshot["optim"])
                 state.retry = True
                 return
-            if not math.isfinite(state.loss):  # never accept a diverged model: stop at the last accepted state
+            if not finite:  # never accept a diverged model: stop at the last accepted state
                 log.warning("epoch %d: %d rollbacks, loss %s; stopping training", state.epoch, self.retries, state.loss)
                 assert self._current is not None
                 state.model.load_state_dict(self._current["model"])
@@ -66,7 +70,7 @@ class LossRatioRollback(Callback):
                 return
             log.warning("epoch %d: %d rollbacks, accepting loss ratio %.3f", state.epoch, self.retries, ratio)
         self.prev_loss = state.loss
-        self.retries = 0
+        self.retries = self.nonfinite = 0
 
 
 class LossScaleByPrevLoss(Callback):

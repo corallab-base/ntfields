@@ -13,21 +13,25 @@ import ntfields
 from ntfields.base import MethodConfig, SpeedModel
 from ntfields.envs import load_env
 from ntfields.registry import available, default_config, get_method
-from ntfields.speed import Clipped, ClippedEased, Smoothstep
+from ntfields.speed import Clipped, ClippedEased, GaussianBand, Smoothstep
 
 C = TypeVar("C", bound=MethodConfig)
 
 
 @dataclass
 class Speed:
-    kind: Literal["clipped", "clipped_eased", "smoothstep"] = "clipped"
+    kind: Literal["clipped", "clipped_eased", "smoothstep", "gaussian_band"] = "clipped"
     dmin: float = 0.01  # clipped, clipped_eased
     dmax: float = 0.1
     floor: float = 0.1  # smoothstep
+    epsilon: float = 0.7  # gaussian_band: must match the ConstrainedEnv's
+    lam: float = 0.1
 
     def build(self) -> SpeedModel:
         if self.kind == "smoothstep":
             return Smoothstep(self.dmax, self.floor)
+        if self.kind == "gaussian_band":
+            return GaussianBand(self.epsilon, self.lam)
         return (Clipped if self.kind == "clipped" else ClippedEased)(self.dmin, self.dmax)
 
 

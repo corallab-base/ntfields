@@ -115,13 +115,19 @@ def sample_valid(problem: Problem, n: int, generator: torch.Generator | None = N
 
 
 def sample_pairs(
-    problem: Problem, n: int, sampler: Sampler | None = None, seed: int = 0, device: str = "cpu"
+    problem: Problem, n: int, sampler: Sampler | None = None, seed: int = 0, device: str = "cpu", chunk: int = 65536
 ) -> PairDataset:
-    """n start/goal pairs with S* and the clearance normal at both ends, evaluated on `device`; returned on CPU."""
+    """n start/goal pairs with S* and the clearance normal at both ends, evaluated on `device` `chunk` at a time (the
+    normal's autograd graph grows with the batch); returned on CPU."""
     generator = torch.Generator().manual_seed(seed)
     q_s, q_g = (sampler or Uniform()).sample(problem, n, generator, device)
-    speed_s, normal_s = problem.speed_and_normal(q_s.to(device))
-    speed_g, normal_g = problem.speed_and_normal(q_g.to(device))
+
+    def label(q: Tensor) -> tuple[Tensor, Tensor]:
+        speeds, normals = zip(*(problem.speed_and_normal(c.to(device)) for c in q.split(chunk)), strict=True)
+        return torch.cat(speeds), torch.cat(normals)
+
+    speed_s, normal_s = label(q_s)
+    speed_g, normal_g = label(q_g)
     return PairDataset(q_s, q_g, speed_s, speed_g, normal_s, normal_g).to("cpu")
 
 

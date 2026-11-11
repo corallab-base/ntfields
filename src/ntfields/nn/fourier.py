@@ -5,13 +5,26 @@ from torch import Tensor, nn
 
 
 class RandomFourierFeatures(nn.Module):
-    """[sin(2π q Bᵀ), cos(2π q Bᵀ)] with a fixed B ~ scale·N(0, 1) of shape (n, dim), saved as a buffer."""
+    """[sin(2π q Bᵀ), cos(2π q Bᵀ)] with a fixed B ~ scale·N(0, 1) of shape (n, dim), saved as a buffer.
+
+    With `truncate`, B is drawn from N(0, 1) truncated to ±truncate, then scaled.
+    """
 
     b: Tensor
 
-    def __init__(self, dim: int, n: int, scale: float, generator: torch.Generator | None = None) -> None:
+    def __init__(
+        self,
+        dim: int,
+        n: int,
+        scale: float,
+        generator: torch.Generator | None = None,
+        truncate: float | None = None,
+    ) -> None:
         super().__init__()
-        self.register_buffer("b", scale * torch.randn(n, dim, generator=generator))
+        b = torch.randn(n, dim, generator=generator)
+        if truncate is not None:
+            b = torch.nn.init.trunc_normal_(b, a=-truncate, b=truncate, generator=generator)
+        self.register_buffer("b", scale * b)
 
     @property
     def out_features(self) -> int:

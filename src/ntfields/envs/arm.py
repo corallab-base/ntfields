@@ -121,6 +121,10 @@ class ArmEnv:
             radii.append(s[:, 3])
         return torch.cat(centers, dim=1), torch.cat(radii)
 
+    def end_pose(self, q: Tensor) -> Tensor:
+        """(B, 4, 4) poses of `end_link` in the base frame."""
+        return self._chain(q).forward_kinematics(q * self.joint_scale).get_matrix()
+
     def distance(self, q: Tensor) -> Tensor:
         return torch.cat([self._distance(c) for c in q.split(self.chunk)]) - self.clearance_offset
 
