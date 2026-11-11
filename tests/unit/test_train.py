@@ -1,5 +1,6 @@
 from dataclasses import fields
 from pathlib import Path
+from typing import Literal
 
 import pytest
 import torch
@@ -8,7 +9,7 @@ import ntfields
 from ntfields import Epochs, Problem, SceneCondition, TrainConfig
 from ntfields.data import PairDataset, sample_pairs
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
-from ntfields.train import Callback, Checkpoint, LossRatioRollback, LossScaleByPrevLoss, Validation, fit
+from ntfields.train import Callback, Checkpoint, LossRatioRollback, LossScaleByPrevLoss, LRScheduler, Validation, fit
 
 
 def test_train_fits_scale_and_round_trips(problem: Problem, tmp_path: Path):
@@ -127,6 +128,44 @@ def test_hooks_run_in_order_once_per_batch(problem: Problem):
         expected += ["epoch_end"]
     assert calls == expected
     assert state.step == 6
+
+
+def test_lr_scheduler_steps_per_batch_or_epoch(problem: Problem):
+    data = sample_pairs(problem, 96)
+    cases: list[tuple[Literal["batch", "epoch"], int]] = [("batch", 6), ("epoch", 2)]
+    for interval, steps in cases:
+        method = Euclidean(EuclideanConfig(lr=1.0))
+        model = method.build_model(problem)
+        sched = LRScheduler(lambda opt: torch.optim.lr_scheduler.StepLR(opt, step_size=1, gamma=0.5), interval)
+        state = fit(method, model, data, SceneCondition(), Epochs(2), 32, [sched])
+        assert state.stateful["lr_scheduler"] is sched.scheduler
+        assert state.optimizer.param_groups[0]["lr"] == pytest.approx(0.5**steps)
+
+
+def test_rollback_restores_stateful_objects(problem: Problem):
+    """A rejected epoch rolls an LR scheduler back with the model and the optimizer."""
+    method = Euclidean(EuclideanConfig(lr=1.0))
+    model = method.build_model(problem)
+    state = ntfields.TrainState(model=model, optimizer=method.optimizer(model))
+    sched = LRScheduler(lambda opt: torch.optim.lr_scheduler.StepLR(opt, step_size=1, gamma=0.5), "batch")
+    sched.on_train_start(state)
+    rollback = LossRatioRollback(threshold=1.2)
+
+    rollback.on_epoch_start(state)
+    state.loss = 1.0
+    rollback.on_epoch_end(state)
+    assert not state.retry
+
+    rollback.on_epoch_start(state)
+    for _ in range(3):
+        state.optimizer.step()  # no gradients: a no-op, but schedulers expect it before their own step
+        sched.on_batch_end(state)
+    assert state.optimizer.param_groups[0]["lr"] == pytest.approx(0.125)
+    state.loss = 2.0
+    rollback.on_epoch_end(state)
+    assert state.retry
+    assert sched.scheduler is not None and sched.scheduler.last_epoch == 0
+    assert state.optimizer.param_groups[0]["lr"] == pytest.approx(1.0)
 
 
 def test_validation_is_the_mean_loss_over_the_held_out_pairs(problem: Problem):

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, ClassVar, Generic, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Protocol, TypeVar
 
 import torch
 from torch import Tensor, nn
@@ -66,6 +66,9 @@ class TrainState:
     batch_terms: dict[str, float] = field(default_factory=dict)
     val_loss: float = float("nan")  # set by a validation callback
     val_terms: dict[str, float] = field(default_factory=dict)
+    # objects with state_dict()/load_state_dict() that belong to the training state (e.g. an LR scheduler): a rollback
+    # restores them together with the model and the optimizer
+    stateful: dict[str, Any] = field(default_factory=dict)
 
 
 class TravelTimeModel(nn.Module, ABC):
