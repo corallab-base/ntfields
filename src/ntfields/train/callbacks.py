@@ -3,8 +3,9 @@ import logging
 import math
 import random
 from collections import defaultdict, deque
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import torch
 
@@ -34,7 +35,8 @@ class LossRatioRollback(Callback):
     """Re-run an epoch from a random recent state when loss / previous loss leaves (0, threshold).
 
     Matches ntrl-demo: the queue holds start-of-epoch states of the last `queue_size` accepted epochs
-    (excluding the current one), and the first previous loss is 1000.
+    (excluding the current one), and the first previous loss is 1000. A state is the model's and the optimizer's,
+    and every object in `state.stateful` (e.g. an `LRScheduler`'s scheduler).
     """
 
     def __init__(self, threshold: float, queue_size: int = 5, max_retries: int = 200, seed: int = 0) -> None:
@@ -52,6 +54,7 @@ class LossRatioRollback(Callback):
         snapshot = {
             "model": copy.deepcopy(state.model.state_dict()),
             "optim": copy.deepcopy(state.optimizer.state_dict()),
+            "stateful": {k: copy.deepcopy(v.state_dict()) for k, v in state.stateful.items()},
         }
         self.queue.append(self._current or snapshot)
         self._current = snapshot
@@ -64,6 +67,8 @@ class LossRatioRollback(Callback):
                 snapshot = self._rng.choice(self.queue)
                 state.model.load_state_dict(snapshot["model"])
                 state.optimizer.load_state_dict(snapshot["optim"])
+                for k, v in snapshot["stateful"].items():
+                    state.stateful[k].load_state_dict(v)
                 state.retry = True
                 return
             log.warning("epoch %d: %d rollbacks, accepting loss ratio %.3f", state.epoch, self.retries, ratio)
@@ -81,6 +86,33 @@ class LossScaleByPrevLoss(Callback):
     def on_epoch_start(self, state: TrainState) -> None:
         if not math.isnan(state.prev_loss):  # at least one accepted epoch
             state.loss_scale = self.numerator / (state.batches * state.prev_loss)
+
+
+class LRScheduler(Callback):
+    """Steps a torch LR scheduler, built by `factory` from the optimizer at the start of training, after every batch
+    (`interval="batch"`, e.g. OneCycleLR) or every epoch. It is registered in `state.stateful`, so a rollback
+    restores it with the optimizer."""
+
+    def __init__(
+        self,
+        factory: Callable[[torch.optim.Optimizer], torch.optim.lr_scheduler.LRScheduler],
+        interval: Literal["batch", "epoch"] = "epoch",
+    ) -> None:
+        self.factory = factory
+        self.interval = interval
+        self.scheduler: torch.optim.lr_scheduler.LRScheduler | None = None
+
+    def on_train_start(self, state: TrainState) -> None:
+        self.scheduler = self.factory(state.optimizer)
+        state.stateful["lr_scheduler"] = self.scheduler
+
+    def on_batch_end(self, state: TrainState) -> None:
+        if self.interval == "batch" and self.scheduler is not None:
+            self.scheduler.step()
+
+    def on_epoch_end(self, state: TrainState) -> None:
+        if self.interval == "epoch" and self.scheduler is not None:
+            self.scheduler.step()
 
 
 class Validation(Callback):

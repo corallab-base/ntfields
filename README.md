@@ -101,13 +101,17 @@ obstacles.
 `ntfields.train` wraps `ntfields.train.fit(method, model, data, scene, budget, batch_size, callbacks)`, whose
 callbacks hook in at train start, epoch start, after each batch's backward pass (before clipping and the step), after
 each step, and at epoch and train end. Besides the rollback, loss-scale, logging and checkpoint callbacks,
-`Validation` evaluates the method's loss on held-out pairs, and `Checkpoint("ckpt_{epoch}.pt", ...)` keeps one file
-per save.
+`LRScheduler` steps a torch scheduler per batch or per epoch (a rollback restores it with the model and the
+optimizer, through `TrainState.stateful`), `Validation` evaluates the method's loss on held-out pairs, and
+`Checkpoint("ckpt_{epoch}.pt", ...)` keeps one file per save.
 
 ```python
-from ntfields.train import Checkpoint, Epochs, Validation, fit
+import torch
 
-callbacks = [Validation(method, val_pairs, scene, batch_size=2000), Checkpoint(path, method, problem, 100)]
+from ntfields.train import Checkpoint, Epochs, LRScheduler, Validation, fit
+
+sched = LRScheduler(lambda opt: torch.optim.lr_scheduler.OneCycleLR(opt, 1e-3, total_steps=1000 * 5), "batch")
+callbacks = [sched, Validation(method, val_pairs, scene, batch_size=2000), Checkpoint(path, method, problem, 100)]
 fit(method, model, train_pairs, scene, Epochs(1000), 2000, callbacks, batches_per_epoch=5)
 ```
 
