@@ -91,7 +91,8 @@ print(benchmark_ur5e(field))
 ```
 
 To train on a fixed dataset instead of sampling, pass `data=` (a `PairDataset`, e.g. `PairDataset.load("pairs.h5")`)
-to `ntfields.train`.
+to `ntfields.train`. The training loop underneath, `ntfields.train.fit`, takes any `PairSource`: an object with
+`.batches(batch_size, scene, generator)`, asked once per epoch, so it can draw new pairs (or scenes) every epoch.
 
 To build other arm scenes, use `ArmEnv.ur5e(points=..., spheres=...)`, which accepts point-cloud and sphere
 obstacles.

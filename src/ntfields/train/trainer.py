@@ -8,7 +8,7 @@ from typing import Any
 import torch
 
 from ntfields.base import Batch, Method, SceneCondition, TrainState, TravelTimeModel
-from ntfields.data import PairDataset
+from ntfields.data import PairSource
 from ntfields.train.budget import Budget
 from ntfields.train.callbacks import Callback
 
@@ -16,7 +16,7 @@ from ntfields.train.callbacks import Callback
 def fit(
     method: Method[Any],
     model: TravelTimeModel,
-    data: PairDataset,
+    data: PairSource,
     scene: SceneCondition,
     budget: Budget,
     batch_size: int,
@@ -29,6 +29,8 @@ def fit(
 
     `micro_batch_size` splits each batch and accumulates the gradients, weighting each part by its share of the
     batch; for a batch-mean loss this is the full batch's gradient (up to rounding) in less memory.
+
+    `data.batches(...)` is called once per epoch (re-run epochs included), so a source may draw new pairs each time.
     """
     state = TrainState(model=model, optimizer=method.optimizer(model))
     for cb in callbacks:
