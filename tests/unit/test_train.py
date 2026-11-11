@@ -56,6 +56,24 @@ def test_registry():
         ntfields.get_method("nope")
 
 
+def test_fit_draws_each_epoch_from_a_pair_source(problem: Problem):
+    """Any object with `batches(...)` feeds fit; it is asked once per epoch, so it can resample."""
+    method = Euclidean(EuclideanConfig())
+    model = method.build_model(problem)
+
+    class Fresh:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def batches(self, batch_size, scene, generator=None):  # noqa: ANN001, ANN202
+            self.calls += 1
+            return sample_pairs(problem, 64, seed=self.calls).batches(batch_size, scene, generator)
+
+    source = Fresh()
+    state = fit(method, model, source, SceneCondition(), Epochs(3), 32)
+    assert source.calls == 3 and state.epoch == 3 and state.batches == 2
+
+
 def test_batches_per_epoch_and_loss_scale(problem: Problem):
     method = Euclidean(EuclideanConfig())
     model = method.build_model(problem)

@@ -1,13 +1,22 @@
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Self
+from typing import Protocol, Self
 
 import h5py
 import torch
 from torch import Tensor
 
 from ntfields.base import Batch, SceneCondition
+
+
+class PairSource(Protocol):
+    """What the trainer draws an epoch's batches from: a PairDataset, or anything else that yields Batches (e.g. one
+    that samples fresh pairs or scenes every epoch)."""
+
+    def batches(
+        self, batch_size: int, scene: SceneCondition, generator: torch.Generator | None = None
+    ) -> Iterator[Batch]: ...
 
 
 @dataclass
