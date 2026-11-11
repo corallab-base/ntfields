@@ -20,6 +20,7 @@ def save(path: Path, method: Method[Any], problem: Problem, model: TravelTimeMod
         "config": asdict(method.cfg),
         "env": _to_spec(problem.env),
         "speed": _to_spec(problem.speed),
+        "metric": None if problem.metric is None else _to_spec(problem.metric),
         "epoch": epoch,
         "state_dict": model.state_dict(),
     }
@@ -30,7 +31,10 @@ def load(path: str | Path, device: str | torch.device = "cpu") -> TrainedField:
     ckpt = torch.load(path, map_location="cpu", weights_only=True)
     method_cls = get_method(ckpt["method"])
     method = method_cls(config_from_dict(method_cls.Config, ckpt["config"]))
-    problem = Problem(_from_spec(ckpt["env"]), _from_spec(ckpt["speed"]))
+    metric = ckpt.get("metric")
+    problem = Problem(
+        _from_spec(ckpt["env"]), _from_spec(ckpt["speed"]), None if metric is None else _from_spec(metric)
+    )
     model = method.build_model(problem)
     model.load_state_dict(ckpt["state_dict"])
     return TrainedField(method, problem, model.to(device).eval(), ckpt_path=Path(path))
@@ -55,7 +59,7 @@ def _rebuild(hint: Any, value: Any) -> Any:
 
 
 def _to_spec(obj: object) -> dict[str, Any]:
-    """Envs and speed models are saved as their dataclass fields plus an import path."""
+    """Envs, speed models and metrics are saved as their dataclass fields plus an import path."""
     if not is_dataclass(obj) or isinstance(obj, type):
         raise TypeError(f"{type(obj).__name__} must be a dataclass to be checkpointed")
     cls = type(obj)

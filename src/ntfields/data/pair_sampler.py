@@ -61,7 +61,7 @@ class NearSurface:
 class SurfaceMix:
     """Mixed pairs: `1 - surface_fraction` uniform free pairs; the rest have one end within `shell` of an
     obstacle and the other a uniform offset in [-perturb, perturb]^dim from it (clamped to the bounds, free), the
-    surface end on the start or goal side with equal probability.
+    surface end on the start or goal side with equal probability (or always on `anchor_end`).
 
     Surface ends come from `anchor`: "project" moves free points along the clearance gradient to a clearance
     uniform in (0, shell) (needs clearance in configuration units, e.g. a
@@ -73,6 +73,7 @@ class SurfaceMix:
     shell: float = 0.2
     perturb: float = 0.5
     anchor: Literal["project", "reject"] = "project"
+    anchor_end: Literal["either", "start", "goal"] = "either"  # which end of a surface pair is the surface end
 
     def sample(
         self, problem: Problem, n: int, generator: torch.Generator, device: str = "cpu"
@@ -99,6 +100,8 @@ class SurfaceMix:
 
         pairs = _rejection_sample(draw, n_surface)
         swap = torch.rand(n_surface, 1, generator=generator) < 0.5
+        if self.anchor_end != "either":
+            swap = torch.full_like(swap, self.anchor_end == "goal")
         a, b = pairs[:, : problem.dim], pairs[:, problem.dim :]
         u_s, u_g = Uniform().sample(problem, n - n_surface, generator, device)
         return torch.cat([u_s, torch.where(swap, b, a)]), torch.cat([u_g, torch.where(swap, a, b)])
@@ -117,7 +120,8 @@ def sample_valid(problem: Problem, n: int, generator: torch.Generator | None = N
 def sample_pairs(
     problem: Problem, n: int, sampler: Sampler | None = None, seed: int = 0, device: str = "cpu", chunk: int = 65536
 ) -> PairDataset:
-    """n start/goal pairs with S* and the clearance normal at both ends, evaluated on `device` `chunk` at a time (the
+    """n start/goal pairs with S* and the clearance normal at both ends (and G, f when the problem has a metric),
+    evaluated on `device` `chunk` at a time (the
     normal's autograd graph grows with the batch); returned on CPU."""
     generator = torch.Generator().manual_seed(seed)
     q_s, q_g = (sampler or Uniform()).sample(problem, n, generator, device)
@@ -128,7 +132,16 @@ def sample_pairs(
 
     speed_s, normal_s = label(q_s)
     speed_g, normal_g = label(q_g)
-    return PairDataset(q_s, q_g, speed_s, speed_g, normal_s, normal_g).to("cpu")
+    data = PairDataset(q_s, q_g, speed_s, speed_g, normal_s, normal_g)
+    if problem.metric is not None:
+
+        def metric(q: Tensor) -> tuple[Tensor, Tensor]:
+            gs, fs = zip(*(problem.metric_at(c.to(device)) for c in q.split(chunk)), strict=True)
+            return torch.cat(gs), torch.cat(fs)
+
+        data.metric_s, data.drift_s = metric(q_s)
+        data.metric_g, data.drift_g = metric(q_g)
+    return data.to("cpu")
 
 
 def _uniform(bounds: Tensor, n: int, generator: torch.Generator | None) -> Tensor:

@@ -9,8 +9,11 @@ from ntfields.problem import Problem
 from ntfields.speed import Clipped
 
 
-def check_method(method_cls: type[Method[Any]], problem: Problem | None = None) -> None:
-    """Smoke checks every Method plugin should pass; raises AssertionError on failure."""
+def check_method(method_cls: type[Method[Any]], problem: Problem | None = None, soft_boundary: bool = False) -> None:
+    """Smoke checks every Method plugin should pass; raises AssertionError on failure.
+
+    `soft_boundary`: the model only learns T(q, q) = 0 through its loss, so it is not checked on an untrained model.
+    """
     problem = problem or Problem(load_env("box2d/one_sphere"), Clipped())
     cfg = method_cls.Config()
     assert config_from_dict(method_cls.Config, asdict(cfg)) == cfg, (
@@ -22,8 +25,9 @@ def check_method(method_cls: type[Method[Any]], problem: Problem | None = None) 
 
     t = model(batch.q_s, batch.q_g, batch.scene)
     assert t.shape == (64,), f"travel time must have shape (B,), got {tuple(t.shape)}"
-    t_self = model(batch.q_s, batch.q_s, batch.scene)
-    assert t_self.abs().max() < 1e-2 * t.abs().mean() + 1e-6, "T(q, q) must be ~0"
+    if not soft_boundary:
+        t_self = model(batch.q_s, batch.q_s, batch.scene)
+        assert t_self.abs().max() < 1e-2 * t.abs().mean() + 1e-6, "T(q, q) must be ~0"
 
     out = method.loss(model, batch, TrainState(model=model, optimizer=method.optimizer(model)))
     assert out.total.ndim == 0 and out.total.isfinite(), "loss must be a finite scalar"

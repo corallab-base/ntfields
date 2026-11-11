@@ -149,7 +149,7 @@ def test_bench_cli(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     bench_main(["run", "--suite", "smoke-v1", "--entries", "euclidean", "--seeds", "0", "--planners", "all",
                 "--suites-dir", str(SUITES), "--device", "cpu", "--out", str(out), "--checkpoint-dir", str(tmp_path),
                 "--epochs", "1", "--n-pairs", "64"])  # fmt: skip
-    assert {r.planner for r in read_records(out)} == {"gradient_bidirectional", "mppi"}
+    assert {r.planner for r in read_records(out)} == {"gradient_bidirectional", "mppi", "riemannian_gradient"}
     bench_main(["report", "--records", str(out)])
     assert "smoke-v1 (test)" in capsys.readouterr().out
     bench_main(["validate", "--records", str(out), "--suites-dir", str(SUITES)])

@@ -1,3 +1,4 @@
+import math
 import time
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
@@ -9,7 +10,7 @@ import torch
 
 from ntfields.base import Batch, Method, SceneCondition, TrainState, TravelTimeModel
 from ntfields.data import PairDataset
-from ntfields.train.budget import Budget
+from ntfields.train.budget import Budget, Epochs
 from ntfields.train.callbacks import Callback
 
 
@@ -30,7 +31,10 @@ def fit(
     `micro_batch_size` splits each batch and accumulates the gradients, weighting each part by its share of the
     batch; for a batch-mean loss this is the full batch's gradient (up to rounding) in less memory.
     """
-    state = TrainState(model=model, optimizer=method.optimizer(model))
+    optimizer = method.optimizer(model)
+    steps_per_epoch = batches_per_epoch or math.ceil(len(data) / batch_size)
+    epochs = budget.n if isinstance(budget, Epochs) else None
+    state = TrainState(model=model, optimizer=optimizer, scheduler=method.scheduler(optimizer, steps_per_epoch, epochs))
     start = time.monotonic()
     while not state.stop and not budget.exhausted(state.epoch, time.monotonic() - start):
         for cb in callbacks:
@@ -67,6 +71,8 @@ def _run_epoch(method: Method[Any], state: TrainState, batches: Iterable[Batch],
         if method.cfg.grad_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(state.model.parameters(), method.cfg.grad_clip_norm)
         state.optimizer.step()
+        if state.scheduler is not None:
+            state.scheduler.step()
         n += 1
     state.loss = total / n
     state.batches = n
@@ -76,7 +82,11 @@ def _run_epoch(method: Method[Any], state: TrainState, batches: Iterable[Batch],
 def _split(batch: Batch, size: int) -> list[Batch]:
     if size >= len(batch.q_s):
         return [batch]
-    parts = {f.name: getattr(batch, f.name).split(size) for f in fields(batch) if f.name not in ("scene", "extras")}
+    parts = {
+        f.name: v.split(size)
+        for f in fields(batch)
+        if f.name not in ("scene", "extras") and (v := getattr(batch, f.name)) is not None
+    }
     extras = {k: v.split(size) for k, v in batch.extras.items()}
     return [
         Batch(**{k: v[i] for k, v in parts.items()}, scene=batch.scene, extras={k: v[i] for k, v in extras.items()})

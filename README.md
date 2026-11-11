@@ -16,12 +16,16 @@ Implemented methods (compared on shared suites by `ntfields bench`; see [Benchma
   [its README](src/ntfields/methods/td_ntfields/README.md))
 - `pntfields`: P-NTFields, matched against the reference code (see
   [its README](src/ntfields/methods/pntfields/README.md))
+- `rantfields`: RaNTFields, for dynamics with a drift and an anisotropic control bound (a gravity-loaded arm, a point
+  mass on a slope or in a current), matched against the reference code (see
+  [its README](src/ntfields/methods/rantfields/README.md))
 
 ## Install
 
 ```bash
 uv sync                    # dev environment (all extras)
 pip install "ntfields[cli,gt]" # as a library: CLI (tyro) and FMM ground truth (scikit-fmm)
+pip install "ntfields[arm,dynamics]" # arm envs (pytorch-kinematics) and rigid-body dynamics (Pinocchio)
 ```
 
 ## TD-NTFields on a 2D point mass
@@ -95,6 +99,30 @@ to `ntfields.train`.
 
 To build other arm scenes, use `ArmEnv.ur5e(points=..., spheres=...)`, which accepts point-cloud and sphere
 obstacles.
+
+## RaNTFields: a drift and an anisotropic metric
+
+A problem can carry a `Metric`: G(q) and a drift f(q) for the dynamics q̇ = f(q) + u, uᵀG(q)u ≤ 1. Pairs then also
+carry G and f, the `riemannian_gradient` planner follows the optimal control, and `ntfields.control` drives a robot
+with it online.
+
+```python
+import torch
+
+import ntfields
+from ntfields.envs import load_env
+from ntfields.metric import FlowField
+from ntfields.speed import ExpRamp
+
+env = load_env("box2d/one_sphere")
+problem = ntfields.Problem(env, ExpRamp.for_env(env), FlowField("constant", vector=(0.8, 0.0)))  # a current
+train_cfg = ntfields.TrainConfig(n_pairs=18_000, batch_size=512, batches_per_epoch=32)
+field = ntfields.train("rantfields_2d", problem, ntfields.Epochs(400), train_cfg=train_cfg)
+result = field.plan(torch.tensor([-0.8, -0.3]), torch.tensor([0.8, 0.3]))
+```
+
+The paper's terrain and UR5e problems and its closed-loop MuJoCo comparison are in
+[benchmarks/rantfields/](benchmarks/rantfields/).
 
 ## Benchmark
 

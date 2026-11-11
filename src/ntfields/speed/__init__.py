@@ -1,6 +1,7 @@
 from ntfields.speed.clipped import Clipped
 from ntfields.speed.clipped_eased import ClippedEased
+from ntfields.speed.exp_ramp import ExpRamp
 from ntfields.speed.gaussian_band import GaussianBand
 from ntfields.speed.smoothstep import Smoothstep
 
-__all__ = ["Clipped", "ClippedEased", "GaussianBand", "Smoothstep"]
+__all__ = ["Clipped", "ClippedEased", "ExpRamp", "GaussianBand", "Smoothstep"]

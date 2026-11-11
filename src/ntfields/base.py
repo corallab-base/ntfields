@@ -31,6 +31,13 @@ class SpeedModel(Protocol):
     def __call__(self, d: Tensor) -> Tensor: ...  # clearance -> S*
 
 
+class Metric(Protocol):
+    """Optional anisotropy and drift of a problem: the dynamics q̇ = f(q) + u with uᵀG(q)u ≤ 1."""
+
+    def G(self, q: Tensor) -> Tensor: ...  # (B, dim) -> (B, dim, dim), symmetric positive definite
+    def drift(self, q: Tensor) -> Tensor: ...  # (B, dim) -> (B, dim) f(q), with f(q)ᵀG(q)f(q) < 1
+
+
 @dataclass
 class Batch:
     q_s: Tensor  # (B, dim)
@@ -40,6 +47,11 @@ class Batch:
     normal_s: Tensor  # (B, dim) unit clearance gradient ∇d/‖∇d‖ (0 where undefined)
     normal_g: Tensor
     scene: SceneCondition
+    # set only when the problem has a `Metric`
+    metric_s: Tensor | None = field(default=None, kw_only=True)  # (B, dim, dim) G(q)
+    metric_g: Tensor | None = field(default=None, kw_only=True)
+    drift_s: Tensor | None = field(default=None, kw_only=True)  # (B, dim) f(q)
+    drift_g: Tensor | None = field(default=None, kw_only=True)
     extras: dict[str, Tensor] = field(default_factory=dict)  # a PairDataset's extras for these pairs
 
 
@@ -53,6 +65,7 @@ class LossOut:
 class TrainState:
     model: "TravelTimeModel"
     optimizer: torch.optim.Optimizer
+    scheduler: torch.optim.lr_scheduler.LRScheduler | None = None  # stepped after every optimizer step
     epoch: int = 0
     loss: float = float("nan")  # mean loss of the last epoch
     prev_loss: float = float("nan")  # mean loss of the last accepted epoch
@@ -102,3 +115,9 @@ class Method(ABC, Generic[C]):
 
     def optimizer(self, model: TravelTimeModel) -> torch.optim.Optimizer:
         return torch.optim.AdamW(model.parameters(), lr=self.cfg.lr, weight_decay=self.cfg.weight_decay)
+
+    def scheduler(
+        self, optimizer: torch.optim.Optimizer, steps_per_epoch: int, epochs: int | None
+    ) -> torch.optim.lr_scheduler.LRScheduler | None:
+        """A per-step LR schedule; `epochs` is None when the budget is not a number of epochs."""
+        return None

@@ -18,6 +18,11 @@ class PairDataset:
     speed_g: Tensor
     normal_s: Tensor  # (N, dim)
     normal_g: Tensor
+    # problem data, set when the problem has a `Metric` (see `sample_pairs`)
+    metric_s: Tensor | None = field(default=None, kw_only=True)  # (N, dim, dim) G(q)
+    metric_g: Tensor | None = field(default=None, kw_only=True)
+    drift_s: Tensor | None = field(default=None, kw_only=True)  # (N, dim) f(q)
+    drift_g: Tensor | None = field(default=None, kw_only=True)
     # per-pair tensors (N, ...) a method needs beyond these (e.g. a flow or a metric at both ends), carried through
     # shuffling, batching and saving untouched; ntfields itself never reads them
     extras: dict[str, Tensor] = field(default_factory=dict)
@@ -31,7 +36,8 @@ class PairDataset:
         return self.q_s.shape[0]
 
     def _tensors(self) -> dict[str, Tensor]:
-        return {f.name: getattr(self, f.name) for f in fields(self) if f.name != "extras"}
+        """The standard fields that are set."""
+        return {f.name: v for f in fields(self) if f.name != "extras" and (v := getattr(self, f.name)) is not None}
 
     def to(self, device: torch.device | str) -> Self:
         return self._map(lambda t: t.to(device))
@@ -66,7 +72,7 @@ class PairDataset:
         extras: dict[str, Tensor] = {}
         with h5py.File(path, "r") as f:
             for fld in fields(cls):
-                if fld.name == "extras":
+                if fld.name == "extras" or fld.name not in f:  # optional fields may be absent
                     continue
                 ds = f[fld.name]
                 assert isinstance(ds, h5py.Dataset)

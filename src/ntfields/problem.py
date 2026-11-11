@@ -4,13 +4,14 @@ import torch
 from torch import Tensor
 
 from ntfields.autodiff import grad
-from ntfields.base import Environment, SpeedModel
+from ntfields.base import Environment, Metric, SpeedModel
 
 
 @dataclass
 class Problem:
     env: Environment
     speed: SpeedModel
+    metric: Metric | None = None  # anisotropy G(q) and drift f(q); None: isotropic, no drift
 
     @property
     def dim(self) -> int:
@@ -29,3 +30,10 @@ class Problem:
                 return s, torch.zeros_like(q)
             g = grad(d, q, create_graph=False)
         return s, torch.nn.functional.normalize(g.nan_to_num(), dim=-1)
+
+    def metric_at(self, q: Tensor) -> tuple[Tensor, Tensor]:
+        """G(q) (B, dim, dim) and f(q) (B, dim), detached; identity and zero without a metric."""
+        if self.metric is None:
+            return torch.eye(q.shape[-1], dtype=q.dtype, device=q.device).expand(len(q), -1, -1), torch.zeros_like(q)
+        with torch.no_grad():
+            return self.metric.G(q), self.metric.drift(q)

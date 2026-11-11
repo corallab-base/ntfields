@@ -1,0 +1,316 @@
+<!-- UR5e from ros-industrial ur_description (BSD-3-Clause, Universal Robots A/S), via robot_descriptions; collision geometry replaced by 23 spheres (as used by RaNTFields). -->
+<robot name="ur5e">
+  <link name="world" />
+  <link name="base_link" />
+  <link name="base_link_inertia">
+    <visual>
+      <origin rpy="0.0 0.0 3.141592653589793" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <mesh filename="file:///home/pgokul/.cache/robot_descriptions/ur_description/meshes/ur5e/visual/base.dae" />
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="4.0" />
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <inertia ixx="0.00443333156" ixy="0.0" ixz="0.0" iyy="0.00443333156" iyz="0.0" izz="0.0072" />
+    </inertial>
+    <collision>
+      <origin xyz="0.0 0.0 0.04139260902721344" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08615622707695529" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="shoulder_link">
+    <visual>
+      <origin rpy="0.0 0.0 3.141592653589793" xyz="0.0 0.0 0.0" />
+      <geometry>
+        <mesh filename="file:///home/pgokul/.cache/robot_descriptions/ur_description/meshes/ur5e/visual/shoulder.dae" />
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="3.761" />
+      <origin rpy="1.570796326794897 0 0" xyz="0.0 -0.00193 -0.02561" />
+      <inertia ixx="0.0070021" ixy="7.3e-07" ixz="-1.053e-05" iyy="0.00648091" iyz="0.00049994" izz="0.00657286" />
+    </inertial>
+    <collision>
+      <origin xyz="2.168404344971009e-19 -0.013887357777126796 0.003246157955493767" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.08455569114391205" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="upper_arm_link">
+    <visual>
+      <origin rpy="1.5707963267948966 0.0 -1.5707963267948966" xyz="0.0 0.0 0.138" />
+      <geometry>
+        <mesh filename="file:///home/pgokul/.cache/robot_descriptions/ur_description/meshes/ur5e/visual/upperarm.dae" />
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="8.058" />
+      <origin rpy="0 0 0" xyz="-0.2125 0.0 0.11336" />
+      <inertia ixx="0.01505885" ixy="-5.4e-05" ixz="5.63e-06" iyy="0.33388086" iyz="-1.81e-06" izz="0.33247207" />
+    </inertial>
+    <collision>
+      <origin xyz="-1.3877787807814457e-17 1.1102230246251565e-16 0.13764609205618009" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.09233838225886876" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.10946098626710775 1.1102230246251565e-16 0.1463951487366166" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.076315274783086" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.22530999184950873 2.7755575615628914e-17 0.13620795576115224" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.07406523893368466" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.3399704082686378 1.6653345369377348e-16 0.14772303048402974" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.07406523893368466" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.4226471432473344 -0.002079955367433134 0.09947420664694792" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.07406523893368466" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.41418814544034976 0.003742533688405686 0.16210699939605938" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.07406523893368466" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="forearm_link">
+    <visual>
+      <origin rpy="1.5707963267948966 0.0 -1.5707963267948966" xyz="0.0 0.0 0.007" />
+      <geometry>
+        <mesh filename="file:///home/pgokul/.cache/robot_descriptions/ur_description/meshes/ur5e/visual/forearm.dae" />
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="2.846" />
+      <origin rpy="0 0 0" xyz="-0.2422 0.0 0.0265" />
+      <inertia ixx="0.00399632" ixy="-1.365e-05" ixz="0.00137272" iyy="0.07879254" iyz="-6.6e-06" izz="0.0784851" />
+    </inertial>
+    <collision>
+      <origin xyz="-0.003296751262588493 -0.0003254783188026411 0.035360115490284734" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.06578178021287974" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.06158456521952799 2.7755575615628914e-17 0.0005221944010578225" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.06214339267789822" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.13868798372838637 0.0 0.0064763506440479665" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05239819010362014" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.20715839911018336 0.0 0.006204904561745127" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05239819010362014" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.2738841818392655 5.551115123125783e-17 0.006297382757683344" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05239819010362014" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.34501071535780153 1.942890293094024e-16 0.007896806268926061" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05239819010362014" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.3895163741600019 0.0 -0.01034743750220838" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05239819010362014" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="-0.38897305669167986 8.986455155601814e-05 0.025916110249107942" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05392905737907306" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="wrist_1_link">
+    <visual>
+      <origin rpy="1.5707963267948966 0.0 0.0" xyz="0.0 0.0 -0.127" />
+      <geometry>
+        <mesh filename="file:///home/pgokul/.cache/robot_descriptions/ur_description/meshes/ur5e/visual/wrist1.dae" />
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="1.37" />
+      <origin rpy="1.570796326794897 0 0" xyz="0.0 -0.01634 -0.0018" />
+      <inertia ixx="0.00165491" ixy="-2.82e-06" ixz="-4.38e-06" iyy="0.00135962" iyz="0.00010157" izz="0.00126279" />
+    </inertial>
+    <collision>
+      <origin xyz="0.0 -8.326672684688674e-17 -0.041875378455540915" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="2.220446049250313e-16 0.018980533516728265 -0.00444073488967342" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05000000000000006" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="2.220446049250313e-16 -0.023004281239665775 -5.551115123125783e-17" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05011675561052207" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="wrist_2_link">
+    <visual>
+      <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 -0.0997" />
+      <geometry>
+        <mesh filename="file:///home/pgokul/.cache/robot_descriptions/ur_description/meshes/ur5e/visual/wrist2.dae" />
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="1.3" />
+      <origin rpy="-1.570796326794897 0 0" xyz="0.0 0.01634 -0.0018" />
+      <inertia ixx="0.00135617" ixy="-2.74e-06" ixz="4.44e-06" iyy="0.00127827" iyz="-5.048e-05" izz="0.00096614" />
+    </inertial>
+    <collision>
+      <origin xyz="1.1102230246251565e-16 -0.021790053438310558 -0.003953979178026534" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0 0.0 -0.01474906017462646" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05498467468050732" />
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0 0.022184145453777004 -1.3877787807814457e-17" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="wrist_3_link">
+    <visual>
+      <origin rpy="1.5707963267948966 0.0 0.0" xyz="0.0 0.0 -0.0989" />
+      <geometry>
+        <mesh filename="file:///home/pgokul/.cache/robot_descriptions/ur_description/meshes/ur5e/visual/wrist3.dae" />
+      </geometry>
+    </visual>
+    <inertial>
+      <mass value="0.365" />
+      <origin rpy="0 0 0" xyz="0.0 0.0 -0.001159" />
+      <inertia ixx="0.00018694" ixy="6e-08" ixz="-1.7e-07" iyy="0.00018908" iyz="-9.2e-07" izz="0.00025756" />
+    </inertial>
+    <collision>
+      <origin xyz="1.1102230246251565e-16 4.163336342344337e-17 -0.018315860005924917" rpy="0 0 0" />
+      <geometry>
+        <sphere radius="0.05030183368370934" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="base_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="world" />
+    <child link="base_link" />
+  </joint>
+  <joint name="base_link-base_link_inertia" type="fixed">
+    <parent link="base_link" />
+    <child link="base_link_inertia" />
+    <origin rpy="0 0 3.141592653589793" xyz="0 0 0" />
+  </joint>
+  <joint name="shoulder_pan_joint" type="revolute">
+    <parent link="base_link_inertia" />
+    <child link="shoulder_link" />
+    <origin rpy="0 0 0" xyz="0 0 0.1625" />
+    <axis xyz="0 0 1" />
+    <limit effort="150.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <joint name="shoulder_lift_joint" type="revolute">
+    <parent link="shoulder_link" />
+    <child link="upper_arm_link" />
+    <origin rpy="1.570796327 0 0" xyz="0 0 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="150.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <joint name="elbow_joint" type="revolute">
+    <parent link="upper_arm_link" />
+    <child link="forearm_link" />
+    <origin rpy="0 0 0" xyz="-0.425 0 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="150.0" lower="-3.141592653589793" upper="3.141592653589793" velocity="3.141592653589793" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <joint name="wrist_1_joint" type="revolute">
+    <parent link="forearm_link" />
+    <child link="wrist_1_link" />
+    <origin rpy="0 0 0" xyz="-0.3922 0 0.1333" />
+    <axis xyz="0 0 1" />
+    <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <joint name="wrist_2_joint" type="revolute">
+    <parent link="wrist_1_link" />
+    <child link="wrist_2_link" />
+    <origin rpy="1.570796327 0 0" xyz="0 -0.0997 -2.044881182297852e-11" />
+    <axis xyz="0 0 1" />
+    <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <joint name="wrist_3_joint" type="revolute">
+    <parent link="wrist_2_link" />
+    <child link="wrist_3_link" />
+    <origin rpy="1.570796326589793 3.141592653589793 3.141592653589793" xyz="0 0.0996 -2.042830148012698e-11" />
+    <axis xyz="0 0 1" />
+    <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="ft_frame" />
+  <joint name="wrist_3_link-ft_frame" type="fixed">
+    <parent link="wrist_3_link" />
+    <child link="ft_frame" />
+    <origin rpy="3.141592653589793 0 0" xyz="0 0 0" />
+  </joint>
+  <link name="base" />
+  <joint name="base_link-base_fixed_joint" type="fixed">
+    <origin rpy="0 0 3.141592653589793" xyz="0 0 0" />
+    <parent link="base_link" />
+    <child link="base" />
+  </joint>
+  <link name="flange" />
+  <joint name="wrist_3-flange" type="fixed">
+    <parent link="wrist_3_link" />
+    <child link="flange" />
+    <origin rpy="0 -1.5707963267948966 -1.5707963267948966" xyz="0 0 0" />
+  </joint>
+  <link name="tool0" />
+  <joint name="flange-tool0" type="fixed">
+    <origin rpy="1.5707963267948966 0 1.5707963267948966" xyz="0 0 0" />
+    <parent link="flange" />
+    <child link="tool0" />
+  </joint>
+</robot>

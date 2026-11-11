@@ -14,6 +14,7 @@ from ntfields.envs.solids import SolidScene
 
 UR5E = Path(__file__).parents[1] / "assets" / "ur5e"
 UR5E_2F85 = Path(__file__).parents[1] / "assets" / "ur5e_2f85"
+UR5E_SPHERIZED = Path(__file__).parents[1] / "assets" / "ur5e_spherized"
 UR5E_LINKS = ("shoulder_link", "upper_arm_link", "forearm_link", "wrist_1_link", "wrist_2_link", "wrist_3_link")
 
 
@@ -43,7 +44,8 @@ def ntrl_random_pairs() -> tuple[Tensor, Tensor]:
 class ArmEnv:
     """Serial arm with collision spheres on its links, among point-cloud, sphere and triangle-mesh obstacles.
 
-    Configurations are q = θ / joint_scale. The clearance is the smallest gap between an arm sphere and an
+    Configurations are q = θ / joint_scale (one scale, or one per joint); joints past `dim` are held at `locked`
+    (default 0). The clearance is the smallest gap between an arm sphere and an
     obstacle, minus `clearance_offset`.
     """
 
@@ -54,7 +56,8 @@ class ArmEnv:
     points: Tensor  # (P, 3) obstacle point cloud (may be empty)
     sphere_centers: Tensor  # (K, 3) obstacle spheres (may be empty)
     sphere_radii: Tensor  # (K,)
-    joint_scale: float = 2 * math.pi
+    joint_scale: float | tuple[float, ...] = 2 * math.pi
+    locked: tuple[float, ...] = ()  # angles of the joints after the first `dim` (default: 0)
     clearance_offset: float = 0.0
     chunk: int = 512  # configurations per distance chunk (memory: chunk x spheres x points)
     mesh: MeshDistance | None = None  # unsigned distance to a triangle mesh
@@ -80,6 +83,38 @@ class ArmEnv:
             sphere_centers=spheres[:, :3],
             sphere_radii=spheres[:, 3],
             clearance_offset=clearance_offset,
+        )
+
+    @classmethod
+    def ur5e_spherized(cls, dof: int = 6, spheres: Tensor | None = None) -> Self:
+        """UR5e with the collision spheres of `assets/ur5e_spherized/ur5e.urdf` (RaNTFields' arm), the first `dof`
+        joints movable and the rest at 0; q = θ / θ_max per joint, so q in [-1, 1]^dof. `spheres` rows are
+        (x, y, z, r)."""
+        import xml.etree.ElementTree as ET
+
+        import pytorch_kinematics as pk  # the [arm] extra
+
+        urdf = (UR5E_SPHERIZED / "ur5e.urdf").read_text()
+        link_spheres: dict[str, Tensor] = {}
+        for link in ET.fromstring(urdf).iter("link"):
+            rows = []
+            for c in link.iter("collision"):
+                sphere, origin = c.find("geometry/sphere"), c.find("origin")
+                if sphere is not None and origin is not None:
+                    rows.append([*map(float, origin.get("xyz", "0 0 0").split()), float(sphere.get("radius", "0"))])
+            if rows:
+                link_spheres[link.get("name", "")] = torch.tensor(rows, dtype=torch.float32)
+        _, upper = pk.build_serial_chain_from_urdf(urdf, "wrist_3_link").get_joint_limits()
+        spheres = torch.zeros(0, 4) if spheres is None else spheres
+        return cls(
+            urdf=urdf,
+            end_link="wrist_3_link",
+            link_spheres=link_spheres,
+            bounds=torch.tensor([[-1.0, 1.0]] * dof),
+            points=torch.zeros(0, 3),
+            sphere_centers=spheres[:, :3],
+            sphere_radii=spheres[:, 3],
+            joint_scale=tuple(float(u) for u in upper[:dof]),
         )
 
     @classmethod
@@ -112,7 +147,7 @@ class ArmEnv:
 
     def arm_spheres(self, q: Tensor) -> tuple[Tensor, Tensor]:
         """World-frame arm sphere centres (B, S, 3) and radii (S,)."""
-        frames = self._chain(q).forward_kinematics(q * self.joint_scale, end_only=False)
+        frames = self._chain(q).forward_kinematics(self._angles(q), end_only=False)
         centers, radii = [], []
         for link, spheres in self.link_spheres.items():
             m = frames[link].get_matrix()  # (B, 4, 4)
@@ -123,7 +158,22 @@ class ArmEnv:
 
     def end_pose(self, q: Tensor) -> Tensor:
         """(B, 4, 4) poses of `end_link` in the base frame."""
-        return self._chain(q).forward_kinematics(q * self.joint_scale).get_matrix()
+        return self._chain(q).forward_kinematics(self._angles(q)).get_matrix()
+
+    def scale(self, like: Tensor) -> Tensor:
+        """`joint_scale` as a tensor (scalar or (dim,)) with `like`'s dtype and device: θ = q · scale."""
+        return torch.as_tensor(self.joint_scale, dtype=like.dtype, device=like.device)
+
+    def _angles(self, q: Tensor) -> Tensor:
+        """Joint angles of the whole chain (B, n) from q (B, dim)."""
+        theta = q * self.scale(q)
+        n = len(self._chain(q).get_joint_parameter_names())
+        if n > theta.shape[-1]:
+            tail = torch.zeros(n - theta.shape[-1], dtype=q.dtype, device=q.device)
+            if self.locked:
+                tail = torch.tensor(self.locked, dtype=q.dtype, device=q.device)
+            theta = torch.cat([theta, tail.expand(len(q), -1)], dim=-1)
+        return theta
 
     def distance(self, q: Tensor) -> Tensor:
         return torch.cat([self._distance(c) for c in q.split(self.chunk)]) - self.clearance_offset

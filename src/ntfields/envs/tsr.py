@@ -64,7 +64,8 @@ class TSRConstraint:
             poses = self._poses(d.to(device))
             q = IK_SOLVERS[self.ik](poses)[:, branches.to(device)]  # (batch, k, dof), radians
             pick = torch.randint(len(self.branches), (len(poses),), generator=generator).to(device)
-            q = q[torch.arange(len(q), device=device), pick] / self.arm.joint_scale
+            q = q[torch.arange(len(q), device=device), pick]
+            q = q / self.arm.scale(q)
             fk = self.arm.end_pose(q)
             good = q.isfinite().all(-1) & self.arm.in_bounds(q) & _pose_close(fk, poses)
             if self.joints is not None:

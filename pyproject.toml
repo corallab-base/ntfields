@@ -13,6 +13,7 @@ dependencies = [
 [project.optional-dependencies]
 arm = ["pytorch-kinematics>=0.7"]
 cli = ["tyro>=0.9"]
+dynamics = ["pin>=3.0", "scipy>=1.11"]  # RaNTFields' arm metric and the geodesic controller
 gt = ["scikit-fmm>=2024.5.29"]
 viz = [
     "viser>=1.1.1",
@@ -22,8 +23,10 @@ viz = [
 ntfields = "ntfields.cli:main"
 
 [dependency-groups]
+sim = ["mujoco==3.12.0", "robot_descriptions==2.0.0"]  # benchmarks/rantfields/sim only: `uv sync --group sim`
 dev = [
     "matplotlib>=3.11.2",
+    "pin>=3.0",
     "pyright>=1.1.400",
     "pytest>=8.3",
     "pytorch-kinematics>=0.7",
@@ -53,7 +56,7 @@ allowed-confusables = ["α", "γ"]  # the papers' symbols
 
 [tool.pyright]
 include = ["src", "tests"]
-exclude = ["tests/private"]
+exclude = ["tests/private", "tests/fidelity/nap_reference.py"]  # nap_reference runs in the reference's env
 pythonVersion = "3.11"
 typeCheckingMode = "standard"
 

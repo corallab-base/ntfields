@@ -6,13 +6,18 @@ from torch import Tensor
 
 from ntfields.plan.gradient_bidirectional import PlanResult, gradient_bidirectional
 from ntfields.plan.mppi import mppi
+from ntfields.plan.riemannian_gradient import riemannian_direction, riemannian_gradient
 
 if TYPE_CHECKING:
     from ntfields.field import TrainedField
 
 Planner = Callable[["TrainedField", Tensor, Tensor], PlanResult]
 
-PLANNERS: dict[str, Planner] = {"gradient_bidirectional": gradient_bidirectional, "mppi": mppi}
+PLANNERS: dict[str, Planner] = {
+    "gradient_bidirectional": gradient_bidirectional,
+    "mppi": mppi,
+    "riemannian_gradient": riemannian_gradient,
+}
 
 
 def register_planner(name: str, planner: Planner) -> None:
@@ -28,4 +33,14 @@ def get_planner(name: str) -> Planner:
     return PLANNERS[name]
 
 
-__all__ = ["PLANNERS", "PlanResult", "Planner", "get_planner", "gradient_bidirectional", "mppi", "register_planner"]
+__all__ = [
+    "PLANNERS",
+    "PlanResult",
+    "Planner",
+    "get_planner",
+    "gradient_bidirectional",
+    "mppi",
+    "register_planner",
+    "riemannian_direction",
+    "riemannian_gradient",
+]
