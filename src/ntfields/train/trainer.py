@@ -31,12 +31,14 @@ def fit(
     batch; for a batch-mean loss this is the full batch's gradient (up to rounding) in less memory.
     """
     state = TrainState(model=model, optimizer=method.optimizer(model))
+    for cb in callbacks:
+        cb.on_train_start(state)
     start = time.monotonic()
     while not state.stop and not budget.exhausted(state.epoch, time.monotonic() - start):
         for cb in callbacks:
             cb.on_epoch_start(state)
         batches = islice(data.batches(batch_size, scene, generator), batches_per_epoch)
-        _run_epoch(method, state, batches, micro_batch_size)
+        _run_epoch(method, state, batches, micro_batch_size, callbacks)
         for cb in callbacks:
             cb.on_epoch_end(state)
             if state.retry:  # later callbacks never see a rejected epoch
@@ -51,22 +53,38 @@ def fit(
     return state
 
 
-def _run_epoch(method: Method[Any], state: TrainState, batches: Iterable[Batch], micro_batch_size: int | None) -> None:
+def _run_epoch(
+    method: Method[Any],
+    state: TrainState,
+    batches: Iterable[Batch],
+    micro_batch_size: int | None,
+    callbacks: Sequence[Callback] = (),
+) -> None:
     state.model.train()
     total, terms, n = 0.0, defaultdict[str, float](float), 0
     for batch in batches:
         state.optimizer.zero_grad()
         size = len(batch.q_s)
+        batch_loss, batch_terms = 0.0, defaultdict[str, float](float)
         for part in _split(batch, micro_batch_size or size):
             w = len(part.q_s) / size
             out = method.loss(state.model, part, state)
             (state.loss_scale * w * out.total).backward()
-            total += w * out.total.item()
+            batch_loss += w * out.total.item()
             for k, v in out.terms.items():
-                terms[k] += w * v
+                batch_terms[k] += w * v
+        for cb in callbacks:
+            cb.on_after_backward(state)
         if method.cfg.grad_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(state.model.parameters(), method.cfg.grad_clip_norm)
         state.optimizer.step()
+        state.step += 1
+        state.batch_loss, state.batch_terms = batch_loss, dict(batch_terms)
+        for cb in callbacks:
+            cb.on_batch_end(state)
+        total += batch_loss
+        for k, v in batch_terms.items():
+            terms[k] += v
         n += 1
     state.loss = total / n
     state.batches = n

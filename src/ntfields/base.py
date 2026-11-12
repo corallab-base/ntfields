@@ -61,6 +61,9 @@ class TrainState:
     terms: dict[str, float] = field(default_factory=dict)
     retry: bool = False  # set by a callback to re-run the epoch
     stop: bool = False
+    step: int = 0  # optimizer steps taken, including those of re-run epochs
+    batch_loss: float = float("nan")  # loss of the last batch
+    batch_terms: dict[str, float] = field(default_factory=dict)
 
 
 class TravelTimeModel(nn.Module, ABC):

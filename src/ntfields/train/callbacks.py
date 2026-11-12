@@ -15,7 +15,14 @@ log = logging.getLogger("ntfields")
 
 
 class Callback:
+    """Hooks into `fit`. Per epoch: on_epoch_start, then per batch on_after_backward (the batch's gradients are
+    accumulated; before clipping and the optimizer step) and on_batch_end (after the step; `state.batch_loss` is
+    set), then on_epoch_end, which may set `state.retry` (later callbacks then skip the epoch) or `state.stop`."""
+
+    def on_train_start(self, state: TrainState) -> None: ...  # once, after the optimizer is built
     def on_epoch_start(self, state: TrainState) -> None: ...
+    def on_after_backward(self, state: TrainState) -> None: ...
+    def on_batch_end(self, state: TrainState) -> None: ...
     def on_epoch_end(self, state: TrainState) -> None: ...  # may set state.retry or state.stop
     def on_train_end(self, state: TrainState) -> None: ...
 
