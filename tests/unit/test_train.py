@@ -8,7 +8,7 @@ import ntfields
 from ntfields import Epochs, Problem, SceneCondition, TrainConfig
 from ntfields.data import PairDataset, sample_pairs
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
-from ntfields.train import Callback, LossRatioRollback, LossScaleByPrevLoss, fit
+from ntfields.train import Callback, LossRatioRollback, LossScaleByPrevLoss, Validation, fit
 
 
 def test_train_fits_scale_and_round_trips(problem: Problem, tmp_path: Path):
@@ -127,3 +127,22 @@ def test_hooks_run_in_order_once_per_batch(problem: Problem):
         expected += ["epoch_end"]
     assert calls == expected
     assert state.step == 6
+
+
+def test_validation_is_the_mean_loss_over_the_held_out_pairs(problem: Problem):
+    method = Euclidean(EuclideanConfig())
+    model = method.build_model(problem)
+    val = sample_pairs(problem, 64, seed=1)
+    seen: list[float] = []
+
+    class Record(Callback):
+        def on_epoch_end(self, state: ntfields.TrainState) -> None:
+            seen.append(state.val_loss)
+
+    callbacks = [Validation(method, val, SceneCondition(), batch_size=16, every=2), Record()]
+    state = fit(method, model, sample_pairs(problem, 64), SceneCondition(), Epochs(4), 32, callbacks)
+    assert seen[0] != seen[0]  # NaN: not validated after the first epoch
+    probe = ntfields.TrainState(model=model, optimizer=state.optimizer, epoch=state.epoch)
+    expected = sum(method.loss(model, b, probe).total.item() for b in val.batches(16, SceneCondition())) / 4
+    assert state.val_loss == pytest.approx(expected)
+    assert model.training  # handed back in training mode

@@ -100,12 +100,13 @@ obstacles.
 
 `ntfields.train` wraps `ntfields.train.fit(method, model, data, scene, budget, batch_size, callbacks)`, whose
 callbacks hook in at train start, epoch start, after each batch's backward pass (before clipping and the step), after
-each step, and at epoch and train end.
+each step, and at epoch and train end. Besides the rollback, loss-scale, logging and checkpoint callbacks,
+`Validation` evaluates the method's loss on held-out pairs.
 
 ```python
-from ntfields.train import Checkpoint, Epochs, Logger, fit
+from ntfields.train import Checkpoint, Epochs, Validation, fit
 
-callbacks = [Logger(100), Checkpoint(path, method, problem, 100)]
+callbacks = [Validation(method, val_pairs, scene, batch_size=2000), Checkpoint(path, method, problem, 100)]
 fit(method, model, train_pairs, scene, Epochs(1000), 2000, callbacks, batches_per_epoch=5)
 ```
 

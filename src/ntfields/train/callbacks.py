@@ -2,13 +2,16 @@ import copy
 import logging
 import math
 import random
-from collections import deque
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ntfields.base import Method, TrainState
+import torch
+
+from ntfields.base import Method, SceneCondition, TrainState
 
 if TYPE_CHECKING:
+    from ntfields.data import PairDataset
     from ntfields.problem import Problem
 
 log = logging.getLogger("ntfields")
@@ -80,6 +83,44 @@ class LossScaleByPrevLoss(Callback):
             state.loss_scale = self.numerator / (state.batches * state.prev_loss)
 
 
+class Validation(Callback):
+    """Every `every` epochs, the mean `method.loss` over `data`'s batches (no optimizer step), as `state.val_loss`
+    and `state.val_terms`. Gradients stay enabled: physics-informed losses differentiate T. Put it after any
+    rollback callback, so a rejected epoch is not validated."""
+
+    def __init__(
+        self,
+        method: Method[Any],
+        data: "PairDataset",
+        scene: SceneCondition,
+        batch_size: int,
+        every: int = 1,
+        seed: int = 0,
+    ) -> None:
+        self.method = method
+        self.data = data
+        self.scene = scene
+        self.batch_size = batch_size
+        self.every = every
+        self.seed = seed
+
+    def on_epoch_end(self, state: TrainState) -> None:
+        if (state.epoch + 1) % self.every:
+            return
+        state.model.eval()
+        total, terms, n = 0.0, defaultdict[str, float](float), 0
+        generator = torch.Generator().manual_seed(self.seed)  # the same batches every time
+        for batch in self.data.batches(self.batch_size, self.scene, generator):
+            out = self.method.loss(state.model, batch, state)
+            total += out.total.item()
+            for k, v in out.terms.items():
+                terms[k] += v
+            n += 1
+        state.model.train()
+        state.val_loss = total / n
+        state.val_terms = {k: v / n for k, v in terms.items()}
+
+
 class Logger(Callback):
     def __init__(self, every: int = 100) -> None:
         self.every = every
@@ -87,7 +128,8 @@ class Logger(Callback):
     def on_epoch_end(self, state: TrainState) -> None:
         if (state.epoch + 1) % self.every == 0:
             terms = " ".join(f"{k}={v:.4g}" for k, v in state.terms.items())
-            log.info("epoch %d loss=%.4g %s", state.epoch + 1, state.loss, terms)
+            val = "" if math.isnan(state.val_loss) else f" val_loss={state.val_loss:.4g}"
+            log.info("epoch %d loss=%.4g%s %s", state.epoch + 1, state.loss, val, terms)
 
 
 class Checkpoint(Callback):
