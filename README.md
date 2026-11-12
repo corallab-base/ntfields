@@ -96,6 +96,19 @@ to `ntfields.train`.
 To build other arm scenes, use `ArmEnv.ur5e(points=..., spheres=...)`, which accepts point-cloud and sphere
 obstacles.
 
+## Custom training loops
+
+`ntfields.train` wraps `ntfields.train.fit(method, model, data, scene, budget, batch_size, callbacks)`, whose
+callbacks hook in at train start, epoch start, after each batch's backward pass (before clipping and the step), after
+each step, and at epoch and train end.
+
+```python
+from ntfields.train import Checkpoint, Epochs, Logger, fit
+
+callbacks = [Logger(100), Checkpoint(path, method, problem, 100)]
+fit(method, model, train_pairs, scene, Epochs(1000), 2000, callbacks, batches_per_epoch=5)
+```
+
 ## Development
 
 ```bash

@@ -87,3 +87,43 @@ def test_micro_batches_give_the_full_batch_gradient(problem: Problem):
     assert states[0].loss == pytest.approx(states[1].loss, rel=1e-12)
     for a, b in zip(states[0].model.parameters(), states[1].model.parameters(), strict=True):
         torch.testing.assert_close(a, b)
+
+
+def test_hooks_run_in_order_once_per_batch(problem: Problem):
+    """on_train_start once; per batch on_after_backward (gradients present, micro-batches accumulated) then
+    on_batch_end (step counted, batch loss set); the epoch loss is the mean of the batch losses."""
+    method = Euclidean(EuclideanConfig())
+    model = method.build_model(problem)
+    calls: list[str] = []
+    batch_losses: list[float] = []
+
+    class Record(Callback):
+        def on_train_start(self, state: ntfields.TrainState) -> None:
+            calls.append("train_start")
+
+        def on_epoch_start(self, state: ntfields.TrainState) -> None:
+            calls.append("epoch_start")
+
+        def on_after_backward(self, state: ntfields.TrainState) -> None:
+            assert all(p.grad is not None for p in state.model.parameters())
+            calls.append("after_backward")
+
+        def on_batch_end(self, state: ntfields.TrainState) -> None:
+            calls.append(f"batch_end:{state.step}")
+            batch_losses.append(state.batch_loss)
+
+        def on_epoch_end(self, state: ntfields.TrainState) -> None:
+            calls.append("epoch_end")
+            assert state.loss == pytest.approx(sum(batch_losses[-state.batches :]) / state.batches)
+
+    data = sample_pairs(problem, 96)
+    state = fit(method, model, data, SceneCondition(), Epochs(2), 32, [Record()], micro_batch_size=10)
+    batch = ["after_backward", "batch_end:{}"]
+    expected = ["train_start"]
+    for epoch in range(2):
+        expected += ["epoch_start"]
+        for b in range(3):
+            expected += [batch[0], batch[1].format(3 * epoch + b + 1)]
+        expected += ["epoch_end"]
+    assert calls == expected
+    assert state.step == 6
