@@ -133,7 +133,9 @@ class Logger(Callback):
 
 
 class Checkpoint(Callback):
-    """Saves at the end of training, and every `every` epochs if every > 0."""
+    """Saves at the end of training, and every `every` epochs if every > 0. A `{epoch}` in the path's file name
+    keeps one file per save, numbered by the epochs completed (also the checkpoint's "epoch"), instead of overwriting
+    one."""
 
     def __init__(self, path: Path, method: Method[Any], problem: "Problem", every: int = 0) -> None:
         self.path = path
@@ -143,12 +145,13 @@ class Checkpoint(Callback):
 
     def on_epoch_end(self, state: TrainState) -> None:
         if self.every and (state.epoch + 1) % self.every == 0:
-            self._save(state)
+            self._save(state, state.epoch + 1)  # state.epoch is still the finished epoch's index
 
     def on_train_end(self, state: TrainState) -> None:
-        self._save(state)
+        self._save(state, state.epoch)
 
-    def _save(self, state: TrainState) -> None:
+    def _save(self, state: TrainState, epochs: int) -> None:
         from ntfields.checkpoint import save
 
-        save(self.path, self.method, self.problem, state.model, state.epoch)
+        path = self.path.with_name(self.path.name.format(epoch=epochs))
+        save(path, self.method, self.problem, state.model, epochs)
