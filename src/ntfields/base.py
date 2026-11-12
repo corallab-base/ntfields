@@ -64,6 +64,8 @@ class TrainState:
     step: int = 0  # optimizer steps taken, including those of re-run epochs
     batch_loss: float = float("nan")  # loss of the last batch
     batch_terms: dict[str, float] = field(default_factory=dict)
+    val_loss: float = float("nan")  # set by a validation callback
+    val_terms: dict[str, float] = field(default_factory=dict)
 
 
 class TravelTimeModel(nn.Module, ABC):
