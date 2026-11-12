@@ -8,7 +8,7 @@ import ntfields
 from ntfields import Epochs, Problem, SceneCondition, TrainConfig
 from ntfields.data import PairDataset, sample_pairs
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
-from ntfields.train import Callback, LossRatioRollback, LossScaleByPrevLoss, Validation, fit
+from ntfields.train import Callback, Checkpoint, LossRatioRollback, LossScaleByPrevLoss, Validation, fit
 
 
 def test_train_fits_scale_and_round_trips(problem: Problem, tmp_path: Path):
@@ -146,3 +146,12 @@ def test_validation_is_the_mean_loss_over_the_held_out_pairs(problem: Problem):
     expected = sum(method.loss(model, b, probe).total.item() for b in val.batches(16, SceneCondition())) / 4
     assert state.val_loss == pytest.approx(expected)
     assert model.training  # handed back in training mode
+
+
+def test_checkpoint_epoch_template(problem: Problem, tmp_path: Path):
+    method = Euclidean(EuclideanConfig())
+    model = method.build_model(problem)
+    ckpt = Checkpoint(tmp_path / "ckpt_{epoch}.pt", method, problem, every=2)
+    fit(method, model, sample_pairs(problem, 64), SceneCondition(), Epochs(4), 32, [ckpt])
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["ckpt_2.pt", "ckpt_4.pt"]
+    assert torch.load(tmp_path / "ckpt_2.pt", weights_only=True)["epoch"] == 2
