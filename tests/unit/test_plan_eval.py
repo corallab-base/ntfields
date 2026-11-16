@@ -2,11 +2,11 @@ import pytest
 import torch
 
 from ntfields import Problem, TrainedField
-from ntfields.envs import load_env
+from ntfields.envs import GridEnv, load_env
 from ntfields.eval import is_collision_free, path_cost, path_length, plan_succeeded, travel_time_error
 from ntfields.field import Field, GoalField
+from ntfields.grid import Interpolation
 from ntfields.gt import FMMField, GridField, fmm_travel_time
-from ntfields.gt.fmm import Interpolation
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
 from ntfields.plan import mppi
 from ntfields.registry import create
@@ -131,6 +131,18 @@ def test_fmm_field_plans_around_obstacle(problem: Problem, planner: str):
     field = FMMField(problem, resolution=101)
     result = field.plan(torch.tensor([-0.6, 0.1]), torch.tensor([0.6, -0.1]), planner)
     assert plan_succeeded(problem, result)
+
+
+def test_fmm_on_a_grid_env_matches_the_sphere_env(problem: Problem):
+    """The one_sphere scene rasterized at 0.01: FMM on it agrees with FMM on the analytic scene, and plans in it."""
+    c = torch.linspace(-0.995, 0.995, 200)
+    x, y = torch.meshgrid(c, c, indexing="ij")
+    grid = Problem(GridEnv.from_occupancy((x**2 + y**2 <= 0.09).numpy(), 0.01, origin=(-1, -1)), problem.speed)
+    goal = torch.tensor([0.6, -0.1])
+    q = torch.tensor([[-0.6, 0.35], [-0.8, -0.6], [0.0, 0.7]])
+    t_grid = fmm_travel_time(grid, goal, resolution=101).travel_time(q)
+    torch.testing.assert_close(t_grid, fmm_travel_time(problem, goal, resolution=101).travel_time(q), rtol=0.02, atol=0)
+    assert plan_succeeded(grid, FMMField(grid, resolution=101).plan(q[0], goal))
 
 
 def test_path_metrics(problem: Problem):

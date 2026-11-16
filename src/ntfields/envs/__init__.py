@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 from ntfields.base import Environment
 from ntfields.envs.arm import ArmEnv
+from ntfields.envs.grid import GridEnv
 from ntfields.envs.sphere_box import SphereBoxEnv
 
 PRESETS: dict[str, Callable[[], Environment]] = {
@@ -21,4 +22,4 @@ def load_env(name: str) -> Environment:
     return PRESETS[name]()
 
 
-__all__ = ["PRESETS", "ArmEnv", "SphereBoxEnv", "load_env"]
+__all__ = ["PRESETS", "ArmEnv", "GridEnv", "SphereBoxEnv", "load_env"]

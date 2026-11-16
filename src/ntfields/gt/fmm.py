@@ -1,30 +1,23 @@
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Literal
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from torch import Tensor
 
+from ntfields.grid import Interpolation, interpolate
 from ntfields.plan import PLANNERS, PlanResult
 from ntfields.problem import Problem
 
 SEED_RADIUS_DX = 1.5  # skfmm needs a zero contour that encloses at least one node
 
 
-Interpolation = Literal["linear", "cubic"]
-
-
 @dataclass
 class GridField:
-    """Travel time to `goal` on a regular grid (array axis i = coordinate i), interpolated between the nodes.
-
-    `interp`:
-    - "cubic" (default): separable Catmull-Rom, which passes through the nodes and has a continuous gradient, so
-      descent doesn't zig-zag at cell edges; it can overshoot slightly next to kinks (the seed, ridges);
-    - "linear": multilinear, whose gradient jumps at every cell edge.
+    """Travel time to `goal` on a regular grid (array axis i = coordinate i), interpolated between the nodes (see
+    `ntfields.grid.interpolate`). Cubic, the default, has a continuous gradient, so descent doesn't zig-zag at cell
+    edges; it can overshoot slightly next to the seed and ridges.
 
     A `GoalField`: queries on another device than `values` copy the grid each time, so move it once with `to`.
     """
@@ -54,38 +47,7 @@ class GridField:
         return g
 
     def _interpolate(self, q: Tensor) -> Tensor:
-        values = self.values.to(q.device)
-        lo, hi = self.bounds.to(q.device, torch.float64).unbind(-1)
-        if self.interp == "linear":
-            u = (2 * (q.double() - lo) / (hi - lo) - 1).flip(-1)  # grid_sample wants (x, y[, z]) = reversed axes
-            dim = q.shape[-1]
-            grid = u.reshape(1, -1, *[1] * (dim - 1), dim)
-            out = F.grid_sample(values[None, None], grid, align_corners=True, padding_mode="border").reshape(-1)
-        else:
-            out = _catmull_rom(values, (q.double() - lo) / (hi - lo))
-        return out.to(q.dtype)
-
-
-def _catmull_rom(values: Tensor, u: Tensor) -> Tensor:
-    """Separable Catmull-Rom interpolation of `values` (R_0, ..., R_{d-1}) at u (B, d) in [0, 1]^d (clamped), with
-    the edge nodes repeated past the border: 4^d taps per query, gathered at once."""
-    values = values.contiguous()
-    device, dim = u.device, values.dim()
-    size = torch.tensor(values.shape, device=device)
-    x = u.clamp(0, 1) * (size - 1)
-    i0 = x.detach().floor().clamp(max=size - 2).long()
-    t = x - i0
-    t2, t3 = t * t, t * t * t
-    # per axis: the 4 nodes i0-1..i0+2 and their weights, (B, d, 4)
-    nodes = (i0[..., None] + torch.arange(-1, 3, device=device)).clamp(min=0).minimum(size[:, None] - 1)
-    weights = torch.stack(
-        ((-t + 2 * t2 - t3) / 2, (2 - 5 * t2 + 3 * t3) / 2, (t + 4 * t2 - 3 * t3) / 2, (t3 - t2) / 2), -1
-    )
-    # every combination of one node per axis, (B, 4^d, d)
-    taps = torch.cartesian_prod(*[torch.arange(4, device=device)] * dim).reshape(-1, dim)
-    axes = torch.arange(dim, device=device)
-    flat_index = (nodes[:, axes, taps] * torch.tensor(values.stride(), device=device)).sum(-1)
-    return (weights[:, axes, taps].prod(-1) * values.view(-1)[flat_index]).sum(-1)
+        return interpolate(self.values, self.bounds, q, self.interp)
 
 
 def fmm_travel_time(

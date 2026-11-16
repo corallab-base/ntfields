@@ -1006,6 +1006,8 @@ cli = [
 ]
 gt = [
     { name = "scikit-fmm" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
 tensorrt = [
     { name = "torch-tensorrt", marker = "python_full_version >= '3.12'" },
@@ -1019,6 +1021,8 @@ dev = [
     { name = "pytorch-kinematics" },
     { name = "ruff" },
     { name = "scikit-fmm" },
+    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "tyro" },
 ]
 
@@ -1028,6 +1032,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.26" },
     { name = "pytorch-kinematics", marker = "extra == 'arm'", specifier = ">=0.7" },
     { name = "scikit-fmm", marker = "extra == 'gt'", specifier = ">=2024.5.29" },
+    { name = "scipy", marker = "extra == 'gt'", specifier = ">=1.11" },
     { name = "torch", specifier = ">=2.4" },
     { name = "torch-tensorrt", marker = "python_full_version >= '3.12' and extra == 'tensorrt'", specifier = ">=2.14,<2.15" },
     { name = "tyro", marker = "extra == 'cli'", specifier = ">=0.9" },
@@ -1042,6 +1047,7 @@ dev = [
     { name = "pytorch-kinematics", specifier = ">=0.7" },
     { name = "ruff", specifier = ">=0.14" },
     { name = "scikit-fmm", specifier = ">=2024.5.29" },
+    { name = "scipy", specifier = ">=1.11" },
     { name = "tyro", specifier = ">=0.9" },
 ]
 
