@@ -21,9 +21,11 @@ def ray_jump(
     resolution: float = 0.005,
     max_speed: float = 1.0,
     goal_tol: float = 1e-3,
+    min_step: float = 1e-3,
     max_passes: int = 100,
     fan: int = 16,
     fan_retries: int = 3,
+    max_eps: float = 0.5,
     generator: torch.Generator | None = None,
 ) -> PlanResult:
     """Long jumps down the field, each certified by its slack; one batched field evaluation per jump.
@@ -38,12 +40,19 @@ def ray_jump(
     the plan). The next ray's direction comes from the same pass.
 
     If no candidate is accepted, the next passes add `fan` fresh random directions (`candidates` points each) to the
-    ray, up to `fan_retries` times; after that, the rays shrink by `min_fraction`. The fan is for ridges of T (e.g. a
-    start and goal mirrored through an obstacle), where the smoothed -∇T points between the two optimal paths and no
-    jump along it has a small slack, while a long jump along either one does.
+    ray. The fan is for ridges of T (e.g. a start and goal mirrored through an obstacle), where the smoothed -∇T
+    points between the two optimal paths and no jump along it has a small slack, while a long jump along either one
+    does. After `fan_retries` failed fans, each further failed pass doubles the tolerance for this jump, up to
+    `max_eps` (then the plan fails): that is for regions where the field's own error exceeds `eps` (a trained field's
+    is largest next to obstacles), where the slack ratio doesn't shrink with the jump. The tolerance resets after
+    each jump, and the bound holds with the largest tolerance used in place of `eps`.
 
-    `eps` can't go below the field's own error: near obstacles, where it is largest, short jumps stall. (An absolute
-    allowance for it would let the planner crawl along ridges in short accepted steps instead of fanning out.)
+    Jumps shorter than `min_step` are never taken: there, T's rounding (float32) swamps the slack, and accepting them
+    would crawl in place instead of fanning out.
+
+    `eps` can't go below the field's own error, relative to the jump: a trained field's needs `eps` ~ 0.1, the FMM's
+    ~ 0.02. (An absolute allowance for it would let the planner crawl along ridges in short accepted steps instead of
+    fanning out.)
     """
     problem = field.problem
     target = field.towards(goal)
@@ -52,12 +61,12 @@ def ray_jump(
     path, passes = [start], 1
     longest = float(t_q[0]) * max_speed
     fractions = min_fraction ** (torch.arange(candidates, dtype=start.dtype, device=start.device) / (candidates - 1))
-    stalls = 0  # passes since the last accepted jump
+    stalls, tol = 0, eps  # passes since the last accepted jump; this jump's slack tolerance
 
     while passes < max_passes:
         if (q[0] - goal).norm() < goal_tol:
             return PlanResult(torch.stack([*path, goal]), True)
-        if longest < 1e-9:
+        if longest < min_step:
             break
 
         direction = -g_q[0]
@@ -77,15 +86,18 @@ def ray_jump(
 
         free, cost = _segments(problem, q[0], ends, resolution)
         slack = cost + t_c - t_q
-        accept = free & (slack <= eps * cost)
+        long_enough = (ends - q).norm(dim=-1) >= min_step
+        long_enough[-1] = True  # the goal
+        accept = free & long_enough & (slack <= tol * cost)
 
         if accept[-1]:
             return PlanResult(torch.stack([*path, goal]), True)
         if not accept.any():
             stalls += 1
             if stalls > fan_retries:
-                longest *= min_fraction
-                stalls = 1
+                if tol >= max_eps:
+                    break
+                tol = min(2 * tol, max_eps)
             continue
 
         progress = torch.where(accept, t_q - t_c, -math.inf)
@@ -93,7 +105,7 @@ def ray_jump(
         q, t_q, g_q = ends[k : k + 1], t_c[k : k + 1], g_c[k : k + 1]
         path.append(q[0])
         longest = float(t_q[0]) * max_speed
-        stalls = 0
+        stalls, tol = 0, eps
 
     return PlanResult(torch.stack(path), False)
 
