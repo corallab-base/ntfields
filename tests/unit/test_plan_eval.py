@@ -1,10 +1,11 @@
+import pytest
 import torch
 
 from ntfields import Problem, TrainedField
 from ntfields.envs import load_env
-from ntfields.eval import is_collision_free, path_cost, path_length, travel_time_error
-from ntfields.field import GoalField
-from ntfields.gt import GridField, fmm_travel_time
+from ntfields.eval import is_collision_free, path_cost, path_length, plan_succeeded, travel_time_error
+from ntfields.field import Field, GoalField
+from ntfields.gt import FMMField, GridField, fmm_travel_time
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
 from ntfields.plan import mppi
 from ntfields.registry import create
@@ -59,6 +60,45 @@ def test_fmm_detours_around_obstacle(problem: Problem):
     gt = fmm_travel_time(problem, torch.tensor([0.6, 0.0]), resolution=101)
     q = torch.tensor([[-0.6, 0.0]])
     assert gt.travel_time(q) > 1.2 * 1.2  # longer than the straight line, even at full speed
+
+
+def test_fmm_field_pair_queries_match_towards(problem: Problem):
+    field: Field = FMMField(problem, resolution=101)
+    goals = torch.tensor([[0.6, 0.0], [-0.5, 0.5]])
+    q_s = torch.tensor([[-0.6, 0.0], [0.7, 0.7], [0.1, -0.8], [-0.2, 0.6]])
+    q_g = goals[[0, 1, 0, 1]]
+    expected = torch.stack([field.towards(g).travel_time(q[None])[0] for q, g in zip(q_s, q_g, strict=True)])
+    torch.testing.assert_close(field.travel_time(q_s, q_g), expected)
+    g_s, _ = field.gradient(q_s, q_g)
+    torch.testing.assert_close(
+        g_s, torch.cat([field.towards(g).gradient(q[None]) for q, g in zip(q_s, q_g, strict=True)])
+    )
+
+
+def test_fmm_field_caches_per_goal(problem: Problem):
+    field = FMMField(problem, resolution=51, cache_size=2)
+    a, b, c = torch.tensor([0.6, 0.0]), torch.tensor([-0.5, 0.5]), torch.tensor([0.0, -0.7])
+    first = field.towards(a)
+    assert field.towards(a.clone()) is first
+    field.towards(b)
+    field.towards(c)
+    assert field.towards(a) is not first  # evicted
+
+
+def test_fmm_field_is_symmetric_and_goal_gradient_points_away_from_start():
+    field = FMMField(_empty(), resolution=201)
+    q_s, q_g = torch.tensor([[-0.6, -0.3]]), torch.tensor([[0.5, 0.4]])
+    torch.testing.assert_close(field.travel_time(q_s, q_g), field.travel_time(q_g, q_s), atol=0.01, rtol=0)
+    g_s, g_g = field.gradient(q_s, q_g)
+    torch.testing.assert_close(g_s, torch.nn.functional.normalize(q_s - q_g), atol=0.03, rtol=0)
+    torch.testing.assert_close(g_g, torch.nn.functional.normalize(q_g - q_s), atol=0.03, rtol=0)
+
+
+@pytest.mark.parametrize("planner", ["mppi", "gradient_bidirectional"])
+def test_fmm_field_plans_around_obstacle(problem: Problem, planner: str):
+    field = FMMField(problem, resolution=101)
+    result = field.plan(torch.tensor([-0.6, 0.1]), torch.tensor([0.6, -0.1]), planner)
+    assert plan_succeeded(problem, result)
 
 
 def test_path_metrics(problem: Problem):
