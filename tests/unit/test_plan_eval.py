@@ -8,7 +8,7 @@ from ntfields.field import Field, GoalField
 from ntfields.grid import Interpolation
 from ntfields.gt import FMMField, GridField, fmm_travel_time
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
-from ntfields.plan import mppi
+from ntfields.plan import mppi, ray_jump
 from ntfields.registry import create
 from ntfields.speed import Clipped
 
@@ -198,3 +198,32 @@ def test_mppi_reaches_goal_in_free_space():
     assert result.success
     assert torch.equal(result.path[0], start) and torch.equal(result.path[-1], goal)
     assert path_length(result.path) < 1.1 * float((goal - start).norm())
+
+
+def _dense_cost(problem: Problem, path: torch.Tensor, h: float = 1e-3) -> float:
+    """Travel time of a polyline, resampled every ~h (path_cost's midpoint rule is coarse on long segments)."""
+    seg = path.diff(dim=0)
+    t = torch.linspace(0, 1, int(seg.norm(dim=-1).max() / h) + 2, dtype=path.dtype)
+    return path_cost(problem, (path[:-1, None] + t[:, None] * seg[:, None]).reshape(-1, path.shape[-1]))
+
+
+def test_ray_jump_goes_straight_to_a_visible_goal():
+    field = _euclidean_field(_empty())
+    start, goal = torch.tensor([-0.6, -0.3]), torch.tensor([0.5, 0.4])
+    result = field.plan(start, goal, "ray_jump")
+    assert result.success
+    assert torch.equal(result.path, torch.stack([start, goal]))
+
+
+@pytest.mark.parametrize(
+    "start", [[-0.6, 0.35], [-0.6, 0.1]], ids=["off_ridge", "mirrored"]
+)  # mirrored: on T's ridge, where the fan is needed
+@pytest.mark.parametrize("eps", [0.02, 0.1])
+def test_ray_jump_plans_around_obstacle_within_its_bound(problem: Problem, start: list[float], eps: float):
+    field = FMMField(problem, resolution=201)
+    start_t, goal = torch.tensor(start, dtype=torch.float64), torch.tensor([0.6, -0.1], dtype=torch.float64)
+    result = ray_jump(field, start_t, goal, eps=eps, generator=torch.Generator().manual_seed(0))
+    assert plan_succeeded(problem, result)
+    assert len(result.path) <= 8  # a few long jumps, not a descent
+    t0 = float(field.towards(goal).travel_time(start_t[None]))
+    assert _dense_cost(problem, result.path) <= t0 / (1 - eps) * 1.001  # the bound, up to the cost's quadrature

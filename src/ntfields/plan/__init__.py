@@ -5,12 +5,13 @@ from torch import Tensor
 
 from ntfields.plan.gradient_bidirectional import PlanResult, gradient_bidirectional
 from ntfields.plan.mppi import mppi
+from ntfields.plan.ray_jump import ray_jump
 
 if TYPE_CHECKING:
     from ntfields.field import Field
 
 Planner = Callable[["Field", Tensor, Tensor], PlanResult]
 
-PLANNERS: dict[str, Planner] = {"gradient_bidirectional": gradient_bidirectional, "mppi": mppi}
+PLANNERS: dict[str, Planner] = {"gradient_bidirectional": gradient_bidirectional, "mppi": mppi, "ray_jump": ray_jump}
 
-__all__ = ["PLANNERS", "PlanResult", "Planner", "gradient_bidirectional", "mppi"]
+__all__ = ["PLANNERS", "PlanResult", "Planner", "gradient_bidirectional", "mppi", "ray_jump"]
