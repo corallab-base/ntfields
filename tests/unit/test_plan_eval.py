@@ -27,7 +27,7 @@ def test_fmm_free_space_is_euclidean():
     gt = fmm_travel_time(problem, torch.tensor([0.2, -0.3]), resolution=101)
     q = torch.tensor([[0.9, 0.9], [-0.7, 0.1], [0.25, -0.3]], dtype=torch.float64)
     torch.testing.assert_close(gt.travel_time(q), (q - gt.goal.double()).norm(dim=-1), atol=0.01, rtol=0)
-    assert travel_time_error(_euclidean_field(problem), gt, q.float()) < 0.01
+    assert travel_time_error(_euclidean_field(problem), gt, gt.goal, q.float()) < 0.01
 
 
 def test_grid_field_is_a_goal_field():
@@ -143,6 +143,14 @@ def test_fmm_on_a_grid_env_matches_the_sphere_env(problem: Problem):
     t_grid = fmm_travel_time(grid, goal, resolution=101).travel_time(q)
     torch.testing.assert_close(t_grid, fmm_travel_time(problem, goal, resolution=101).travel_time(q), rtol=0.02, atol=0)
     assert plan_succeeded(grid, FMMField(grid, resolution=101).plan(q[0], goal))
+
+
+def test_travel_time_error_takes_any_goal_field(problem: Problem):
+    goal = torch.tensor([0.6, 0.0])
+    fmm = FMMField(problem, resolution=101)
+    starts = torch.tensor([[-0.6, 0.0], [0.0, 0.7], [0.5, -0.5]])
+    assert travel_time_error(fmm, fmm.towards(goal), goal, starts) == 0.0
+    assert travel_time_error(_euclidean_field(problem), fmm.towards(goal), goal, starts) > 0.1  # ignores the obstacle
 
 
 def test_path_metrics(problem: Problem):

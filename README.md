@@ -51,13 +51,18 @@ path = result.path.cpu()
 print(result.success, is_collision_free(problem, path), path_cost(problem, path))
 
 gt = fmm_travel_time(problem, goal.cpu())  # ground truth (needs the [gt] extra)
-print(travel_time_error(field, gt, sample_valid(problem, 500).to(device)))
+print(travel_time_error(field, gt, goal, sample_valid(problem, 500).to(device)))
 
 field = ntfields.load(field.ckpt_path, device=device)  # reload later from the checkpoint
 ```
 
 For many queries against one goal, `field.towards(goal)` encodes the goal once and gives `.travel_time(q)` and
 `.gradient(q)` for batches q; MPPI plans this way.
+
+`ntfields.gt.FMMField(problem)` is the same FMM ground truth as a field: one cached solve per goal, interpolated
+with Catmull-Rom (`interp="linear"` for multilinear), so planners and `ntfields.eval` take it in place of a trained
+field. `ntfields.envs.GridEnv.from_occupancy(grid, resolution, origin)` makes an environment from an occupancy grid
+(a pyrobosim or ROS map), for FMM or training.
 
 The same run from the CLI (needs the `[cli]` extra). `--method.*` sets any field of the method's config:
 
