@@ -11,9 +11,9 @@ from ntfields.inference import autograd_inference
 from ntfields.registry import create
 from ntfields.speed import Clipped
 
-pytest.importorskip("torch_tensorrt")
-if not torch.cuda.is_available():
+if not torch.cuda.is_available():  # importing torch_tensorrt on CPU torch raises AssertionError, not ImportError
     pytest.skip("TensorRT needs CUDA", allow_module_level=True)
+pytest.importorskip("torch_tensorrt")
 
 import tensorrt
 
