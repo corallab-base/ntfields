@@ -18,6 +18,6 @@ jobs:
           python-version: ${{ inputs.python }}
           enable-cache: true
       - name: Install (CPU torch)
-        run: .github/install-cpu.sh
+        run: .github/install-cpu.sh --no-extra tensorrt  # TensorRT needs CUDA to import
       # tests/fidelity and tests/private need local reference checkouts (and some CUDA); run them locally
       - run: uv run --no-sync pytest tests/unit tests/test_end_to_end.py
