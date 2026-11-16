@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from ntfields import Problem, SceneCondition
-from ntfields.data import NearSurface, PairDataset, SurfaceMix, sample_pairs
+from ntfields.data import Mixture, NearSurface, PairDataset, SurfaceMix, Uniform, sample_pairs
 
 
 def test_samples_are_valid_and_deterministic(problem: Problem):
@@ -64,3 +64,14 @@ def test_extras_follow_their_pairs(problem: Problem, tmp_path: Path):
     torch.testing.assert_close(loaded.extras["id"], data.extras["id"])
     with pytest.raises(ValueError):
         PairDataset(data.q_s, data.q_g, data.speed_s, data.speed_g, data.normal_s, data.normal_g, {"x": torch.zeros(3)})
+
+
+def test_mixture_takes_each_share_from_its_sampler(problem: Problem):
+    near = NearSurface(margin=0.05, max_step=0.1)
+    q_s, q_g = Mixture((near, Uniform()), (0.3, 0.7)).sample(problem, 100, torch.Generator().manual_seed(0))
+    assert q_s.shape == q_g.shape == (100, 2)
+    d = problem.env.distance(q_s)
+    assert ((d[:30] > 0) & (d[:30] < 0.05)).all()
+    assert (q_g[:30] - q_s[:30]).norm(dim=-1).max() <= 0.1 + 1e-6
+    with pytest.raises(ValueError):
+        Mixture((near, Uniform()), (0.5, 0.6))

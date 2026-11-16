@@ -1,8 +1,9 @@
 from ntfields.data.pair_dataset import PairDataset, PairSource
-from ntfields.data.pair_sampler import NearSurface, Sampler, SurfaceMix, Uniform, sample_pairs, sample_valid
+from ntfields.data.pair_sampler import Mixture, NearSurface, Sampler, SurfaceMix, Uniform, sample_pairs, sample_valid
 from ntfields.data.ur5e_pairs import UR5eSurfacePairs
 
 __all__ = [
+    "Mixture",
     "NearSurface",
     "PairDataset",
     "PairSource",

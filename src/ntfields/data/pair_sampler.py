@@ -101,6 +101,27 @@ class SurfaceMix:
         return torch.cat([u_s, torch.where(swap, b, a)]), torch.cat([u_g, torch.where(swap, a, b)])
 
 
+@dataclass
+class Mixture:
+    """`fractions[i]` of the pairs from `samplers[i]` (rounded; the last sampler takes the remainder), concatenated in
+    order: training shuffles them."""
+
+    samplers: tuple[Sampler, ...]
+    fractions: tuple[float, ...]
+
+    def __post_init__(self) -> None:
+        if len(self.samplers) != len(self.fractions) or abs(sum(self.fractions) - 1) > 1e-6:
+            raise ValueError("Mixture needs one fraction per sampler, summing to 1")
+
+    def sample(
+        self, problem: Problem, n: int, generator: torch.Generator, device: str = "cpu"
+    ) -> tuple[Tensor, Tensor]:
+        counts = [round(n * f) for f in self.fractions[:-1]]
+        counts.append(n - sum(counts))
+        parts = [s.sample(problem, m, generator, device) for s, m in zip(self.samplers, counts, strict=True) if m > 0]
+        return torch.cat([q_s for q_s, _ in parts]), torch.cat([q_g for _, q_g in parts])
+
+
 def sample_valid(problem: Problem, n: int, generator: torch.Generator | None = None) -> Tensor:
     """n uniform samples inside the bounds with positive clearance."""
 

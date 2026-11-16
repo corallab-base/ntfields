@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -6,7 +7,7 @@ from typing import Any
 import torch
 
 from ntfields.base import Method, MethodConfig
-from ntfields.data import PairDataset, Sampler, sample_pairs
+from ntfields.data import PairDataset, PairSource, Sampler, sample_pairs
 from ntfields.field import TrainedField
 from ntfields.problem import Problem
 from ntfields.registry import create
@@ -41,13 +42,33 @@ def train(
 ) -> TrainedField:
     """Train `method` (a registered name or preset, or an instance) on `problem`; `sampler` overrides the
     method's default pair sampler, and `data` (pre-built pairs) replaces sampling."""
+    method = resolve_method(method, cfg)
+    return train_with(method, method, problem, budget, train_cfg or TrainConfig(), sampler, data)
+
+
+def resolve_method(method: str | Method[Any], cfg: MethodConfig | None = None) -> Method[Any]:
+    """A registered method or preset by name (with `cfg`), or an instance as is."""
     if isinstance(method, str):
-        method = create(method, cfg)
-    elif cfg is not None:
+        return create(method, cfg)
+    if cfg is not None:
         raise ValueError("pass cfg only together with a method name")
+    return method
+
+
+def train_with(
+    method: Method[Any],
+    trainer: Method[Any],
+    problem: Problem,
+    budget: Budget,
+    tc: TrainConfig,
+    sampler: Sampler | None = None,
+    data: PairDataset | None = None,
+    source: Callable[[PairDataset], PairSource] = lambda pairs: pairs,
+) -> TrainedField:
+    """`train`, with the loss and callbacks of `trainer` (e.g. a Distillation of `method`) and batches from
+    `source(pairs)`; the model is built, checkpointed and returned as `method`'s."""
     if data is not None and sampler is not None:
         raise ValueError("pass either sampler or data")
-    tc = train_cfg or TrainConfig()
     if data is None:
         data = sample_pairs(problem, tc.n_pairs, sampler or method.default_sampler(), tc.seed, tc.device)
 
@@ -56,7 +77,7 @@ def train(
     torch.manual_seed(tc.seed)
     data = data[torch.randperm(len(data))].to(tc.device)
     model = method.build_model(problem).to(tc.device)
-    callbacks: list[Callback] = [*method.callbacks(), Logger(tc.log_every)]
+    callbacks: list[Callback] = [*trainer.callbacks(), Logger(tc.log_every)]
     ckpt_path = None
     if tc.out_dir is not None:
         ckpt_path = tc.out_dir / method.name / datetime.now().strftime("%Y%m%d-%H%M%S") / "ckpt.pt"
@@ -64,9 +85,9 @@ def train(
 
     scene = problem.env.condition()
     fit(
-        method,
+        trainer,
         model,
-        data,
+        source(data),
         scene,
         budget,
         tc.batch_size,
