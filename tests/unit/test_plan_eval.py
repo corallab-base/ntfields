@@ -6,6 +6,7 @@ from ntfields.envs import load_env
 from ntfields.eval import is_collision_free, path_cost, path_length, plan_succeeded, travel_time_error
 from ntfields.field import Field, GoalField
 from ntfields.gt import FMMField, GridField, fmm_travel_time
+from ntfields.gt.fmm import Interpolation
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
 from ntfields.plan import mppi
 from ntfields.registry import create
@@ -36,24 +37,55 @@ def test_grid_field_is_a_goal_field():
     assert gt.travel_time(q).dtype == q.dtype
 
 
-def test_grid_field_gradient_in_free_space():
+@pytest.mark.parametrize("interp", ["linear", "cubic"])
+def test_grid_field_gradient_in_free_space(interp: Interpolation):
     """In free space at full speed, ∇T is the unit vector away from the goal."""
     goal = torch.tensor([0.2, -0.3])
-    gt = fmm_travel_time(_empty(), goal, resolution=201)
+    gt = fmm_travel_time(_empty(), goal, resolution=201, interp=interp)
     q = torch.tensor([[0.9, 0.9], [-0.7, 0.1], [0.6, -0.8]], dtype=torch.float64)
     away = torch.nn.functional.normalize(q - goal.double(), dim=-1)
     torch.testing.assert_close(gt.gradient(q), away, atol=0.03, rtol=0)
     assert not gt.gradient(q).requires_grad
 
 
-def test_grid_field_gradient_matches_finite_differences(problem: Problem):
-    gt = fmm_travel_time(problem, torch.tensor([0.6, 0.0]), resolution=101)
+@pytest.mark.parametrize("interp", ["linear", "cubic"])
+def test_grid_field_gradient_matches_finite_differences(problem: Problem, interp: Interpolation):
+    gt = fmm_travel_time(problem, torch.tensor([0.6, 0.0]), resolution=101, interp=interp)
     q = torch.tensor([[-0.613, 0.057], [0.031, 0.607]], dtype=torch.float64)  # off grid lines, where it is smooth
     h = 1e-6
     fd = torch.stack(
         [(gt.travel_time(q + h * e) - gt.travel_time(q - h * e)) / (2 * h) for e in torch.eye(2, dtype=q.dtype)], dim=-1
     )
     torch.testing.assert_close(gt.gradient(q), fd, atol=1e-5, rtol=1e-5)
+
+
+def test_cubic_passes_through_nodes(problem: Problem):
+    gt = fmm_travel_time(problem, torch.tensor([0.6, 0.0]), resolution=51)
+    nodes = torch.tensor([[-0.6, 0.12], [0.36, -0.8], [-1.0, 1.0]], dtype=torch.float64)  # on the 0.04 grid
+    ij = ((nodes + 1) / 0.04).round().long()
+    torch.testing.assert_close(gt.travel_time(nodes), gt.values[ij[:, 0], ij[:, 1]])
+
+
+def test_cubic_gradient_is_continuous_across_cell_edges(problem: Problem):
+    """Linear interpolation's gradient jumps at a grid line; Catmull-Rom's doesn't."""
+    edge = torch.tensor([[-0.6, 0.12]], dtype=torch.float64)  # x = -0.6 is a grid line at resolution 51
+    across = torch.tensor([[1e-7, 0.0]], dtype=torch.float64)
+    jump = {}
+    for interp in ("linear", "cubic"):
+        gt = fmm_travel_time(problem, torch.tensor([0.6, 0.0]), resolution=51, interp=interp)
+        jump[interp] = float((gt.gradient(edge + across) - gt.gradient(edge - across)).norm())
+    assert jump["linear"] > 1e-2
+    assert jump["cubic"] < 1e-5
+
+
+def test_cubic_reproduces_linear_functions_in_3d():
+    axes = [torch.linspace(-1, 1, 11, dtype=torch.float64)] * 3
+    x, y, z = torch.meshgrid(*axes, indexing="ij")
+    a = torch.tensor([0.5, -2.0, 1.5], dtype=torch.float64)
+    gt = GridField(a[0] * x + a[1] * y + a[2] * z, torch.tensor([[-1.0, 1.0]] * 3), torch.zeros(3))
+    q = torch.rand(32, 3, generator=torch.Generator().manual_seed(0), dtype=torch.float64) * 1.6 - 0.8  # interior
+    torch.testing.assert_close(gt.travel_time(q), q @ a)
+    torch.testing.assert_close(gt.gradient(q), a.expand_as(q))
 
 
 def test_fmm_detours_around_obstacle(problem: Problem):
