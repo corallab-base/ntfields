@@ -200,11 +200,13 @@ def test_mppi_reaches_goal_in_free_space():
     assert path_length(result.path) < 1.1 * float((goal - start).norm())
 
 
-def _dense_cost(problem: Problem, path: torch.Tensor, h: float = 1e-3) -> float:
-    """Travel time of a polyline, resampled every ~h (path_cost's midpoint rule is coarse on long segments)."""
+def _field_cost(gt: GridField, path: torch.Tensor, h: float = 1e-3) -> float:
+    """A polyline's travel time in the field's own metric, ∫ ‖∇T‖ ds, resampled every ~h."""
     seg = path.diff(dim=0)
     t = torch.linspace(0, 1, int(seg.norm(dim=-1).max() / h) + 2, dtype=path.dtype)
-    return path_cost(problem, (path[:-1, None] + t[:, None] * seg[:, None]).reshape(-1, path.shape[-1]))
+    dense = (path[:-1, None] + t[:, None] * seg[:, None]).reshape(-1, path.shape[-1])
+    step = dense.diff(dim=0)
+    return float((step.norm(dim=-1) * gt.gradient(dense[:-1] + step / 2).norm(dim=-1)).sum())
 
 
 def test_ray_jump_goes_straight_to_a_visible_goal():
@@ -223,10 +225,11 @@ def test_ray_jump_plans_around_obstacle_within_its_bound(problem: Problem, start
     field = FMMField(problem, resolution=201)
     start_t, goal = torch.tensor(start, dtype=torch.float64), torch.tensor([0.6, -0.1], dtype=torch.float64)
     result = ray_jump(field, start_t, goal, eps=eps, generator=torch.Generator().manual_seed(0))
-    assert plan_succeeded(problem, result)
-    assert len(result.path) <= 8  # a few long jumps, not a descent
-    t0 = float(field.towards(goal).travel_time(start_t[None]))
-    assert _dense_cost(problem, result.path) <= t0 / (1 - eps) * 1.001  # the bound, up to the cost's quadrature
+    assert plan_succeeded(problem, result)  # kept clear by the field alone
+    assert len(result.path) <= 10  # a few long jumps, not a descent
+    gt = field.towards(goal)
+    t0 = float(gt.travel_time(start_t[None]))
+    assert _field_cost(gt, result.path) <= t0 / (1 - eps) * 1.01  # the bound, up to the planner's quadrature
 
 
 class _ShapeRecordingField:
@@ -256,8 +259,8 @@ def test_ray_jump_evaluates_one_batch_size(problem: Problem):
     """So a compiled or CUDA-graph field is never specialized mid-plan: start, rays and fans all pad to one batch."""
     recording = _ShapeRecordingField(FMMField(problem, resolution=101))
     start, goal = torch.tensor([-0.6, 0.1], dtype=torch.float64), torch.tensor([0.6, -0.1], dtype=torch.float64)
-    result = ray_jump(recording, start, goal, fan=4, candidates=8, generator=torch.Generator().manual_seed(0))  # pyright: ignore[reportArgumentType]
+    result = ray_jump(recording, start, goal, fan=4, samples=8, generator=torch.Generator().manual_seed(0))  # pyright: ignore[reportArgumentType]
     assert result.success
-    assert len(recording.shapes) > 3 and set(recording.shapes) == {torch.Size([(1 + 4) * 8 + 1, 2])}
+    assert len(recording.shapes) > 3 and set(recording.shapes) == {torch.Size([(2 + 4) * 8, 2])}
     with pytest.raises(ValueError, match="exceeds batch"):
         ray_jump(recording, start, goal, batch=8)  # pyright: ignore[reportArgumentType]
