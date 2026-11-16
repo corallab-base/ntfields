@@ -28,7 +28,7 @@ def test_train_plan_evaluate(problem: Problem, tmp_path: Path):
 
     gt = fmm_travel_time(problem, goal, resolution=101)
     starts = torch.tensor([[-0.8, 0.7], [0.0, -0.8], [0.5, 0.5]])
-    assert torch.isfinite(torch.tensor(travel_time_error(field, gt, starts)))
+    assert torch.isfinite(torch.tensor(travel_time_error(field, gt, goal, starts)))
 
 
 def test_cli_train(tmp_path: Path, capsys: pytest.CaptureFixture[str]):

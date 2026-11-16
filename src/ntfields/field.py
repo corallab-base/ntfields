@@ -26,9 +26,16 @@ class Field(Protocol):
     def towards(self, goal: Tensor) -> "GoalField": ...
 
 
+class GoalField(Protocol):
+    """T(·, q_g) for one fixed goal: what `Field.towards` returns."""
+
+    def travel_time(self, q: Tensor) -> Tensor: ...  # (B, dim) -> (B,)
+    def gradient(self, q: Tensor) -> Tensor: ...  # (B, dim) -> ∇_q T (B, dim)
+
+
 @dataclass
-class GoalField:
-    """T(·, q_g) for one goal, encoded once (see `TrainedField.towards`)."""
+class EncodedGoalField:
+    """A network's T(·, q_g) for one goal, encoded once (see `TrainedField.towards`)."""
 
     inference: InferenceModel
     e_g: Tensor  # inference.encode_goal(q_g)
@@ -69,11 +76,11 @@ class TrainedField:
             g_s, g_g = torch.autograd.grad(t.sum(), (q_s, q_g))
         return g_s, g_g
 
-    def towards(self, goal: Tensor) -> GoalField:
+    def towards(self, goal: Tensor) -> EncodedGoalField:
         """T(·, goal) for a goal (dim,), which is encoded once instead of once per query."""
         inference = autograd_inference(self.model, self.problem.env.condition())
         with torch.no_grad():
-            return GoalField(inference, inference.encode_goal(goal[None]))
+            return EncodedGoalField(inference, inference.encode_goal(goal[None]))
 
     def plan(self, start: Tensor, goal: Tensor, planner: str | None = None) -> PlanResult:
         """Single query with `planner` (default: the method's default planner)."""

@@ -1,8 +1,7 @@
 import torch
 from torch import Tensor
 
-from ntfields.field import Field
-from ntfields.gt import GridField
+from ntfields.field import Field, GoalField
 from ntfields.plan import PlanResult
 from ntfields.problem import Problem
 
@@ -32,9 +31,10 @@ def plan_succeeded(problem: Problem, result: PlanResult) -> bool:
     return result.success and is_collision_free(problem, result.path)
 
 
-def travel_time_error(field: Field, gt: GridField, starts: Tensor) -> float:
-    """Mean |T_field(start, goal) - T_gt(start)| over starts with a finite ground truth."""
-    goals = gt.goal.to(starts).expand_as(starts)
-    t_gt = gt.value(starts)
+def travel_time_error(field: Field, gt: GoalField, goal: Tensor, starts: Tensor) -> float:
+    """Mean |T_field(start, goal) - T_gt(start)| over starts with a finite reference, where `gt` is T(·, goal): e.g.
+    `ntfields.gt.fmm_travel_time(problem, goal)`, or any field's `towards(goal)`."""
+    goals = goal.to(starts).expand_as(starts)
+    t_gt = gt.travel_time(starts)
     finite = t_gt.isfinite()
     return float((field.travel_time(starts, goals) - t_gt).abs()[finite].mean())
