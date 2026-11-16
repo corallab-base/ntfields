@@ -26,7 +26,7 @@ from torch import Tensor
 
 from ntfields.accel.cuda_graphs import CudaGraphs
 from ntfields.base import Method
-from ntfields.field import GoalField, TrainedField
+from ntfields.field import EncodedGoalField, TrainedField
 from ntfields.inference import InferenceModel
 from ntfields.plan import PLANNERS, PlanResult
 from ntfields.problem import Problem
@@ -69,10 +69,10 @@ class AcceleratedField:
             _, g_s, g_g = self.inference.pair_gradient(q_s, q_g)
         return g_s, g_g
 
-    def towards(self, goal: Tensor) -> GoalField:
+    def towards(self, goal: Tensor) -> EncodedGoalField:
         """T(·, goal) for a goal (dim,), which is encoded once instead of once per query."""
         with torch.no_grad():
-            return GoalField(self.inference, self.inference.encode_goal(goal[None]))
+            return EncodedGoalField(self.inference, self.inference.encode_goal(goal[None]))
 
     def plan(self, start: Tensor, goal: Tensor, planner: str | None = None) -> PlanResult:
         """Single query with `planner` (default: the method's default planner)."""
