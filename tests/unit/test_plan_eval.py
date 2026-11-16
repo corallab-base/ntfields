@@ -9,6 +9,7 @@ from ntfields.grid import Interpolation
 from ntfields.gt import FMMField, GridField, fmm_travel_time
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
 from ntfields.plan import mppi, ray_jump
+from ntfields.plan.ray_jump import batch_sizes, warm_up
 from ntfields.registry import create
 from ntfields.speed import Clipped
 
@@ -212,9 +213,13 @@ def _field_cost(gt: GridField, path: torch.Tensor, h: float = 1e-3) -> float:
 def test_ray_jump_goes_straight_to_a_visible_goal():
     field = _euclidean_field(_empty())
     start, goal = torch.tensor([-0.6, -0.3]), torch.tensor([0.5, 0.4])
-    result = field.plan(start, goal, "ray_jump")
+    result = ray_jump(field, start, goal, max_spacing=None)
     assert result.success
     assert torch.equal(result.path, torch.stack([start, goal]))
+
+    capped = field.plan(start, goal, "ray_jump")  # jumps of at most 64 · 0.01, along the same line
+    assert capped.success and 2 < len(capped.path) <= 4
+    assert path_length(capped.path) == pytest.approx(float((goal - start).norm()), rel=1e-4)
 
 
 @pytest.mark.parametrize(
@@ -255,12 +260,14 @@ class _ShapeRecordingGoalField:
         return self.inner.travel_time_and_gradient(q)
 
 
-def test_ray_jump_evaluates_one_batch_size(problem: Problem):
-    """So a compiled or CUDA-graph field is never specialized mid-plan: start, rays and fans all pad to one batch."""
+def test_ray_jump_evaluates_two_batch_sizes(problem: Problem):
+    """So a compiled or CUDA-graph field is never specialized mid-plan: plain passes (and the start) pad to one batch
+    size and fan passes to another, both of which warm_up evaluates first."""
     recording = _ShapeRecordingField(FMMField(problem, resolution=101))
     start, goal = torch.tensor([-0.6, 0.1], dtype=torch.float64), torch.tensor([0.6, -0.1], dtype=torch.float64)
+    sizes = {torch.Size([n, 2]) for n in batch_sizes(samples=8, fan=4)}
+    warm_up(recording, goal, samples=8, fan=4)  # pyright: ignore[reportArgumentType]
+    assert set(recording.shapes) == sizes
     result = ray_jump(recording, start, goal, fan=4, samples=8, generator=torch.Generator().manual_seed(0))  # pyright: ignore[reportArgumentType]
     assert result.success
-    assert len(recording.shapes) > 3 and set(recording.shapes) == {torch.Size([(2 + 4) * 8, 2])}
-    with pytest.raises(ValueError, match="exceeds batch"):
-        ray_jump(recording, start, goal, batch=8)  # pyright: ignore[reportArgumentType]
+    assert len(recording.shapes) > 5 and set(recording.shapes) == sizes  # the mirrored query needs fans
