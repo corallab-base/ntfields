@@ -92,15 +92,20 @@ def ray_jump(
         if stalls:
             extra = torch.randn(fan, len(direction), generator=generator, dtype=start.dtype, device=start.device)
             directions = torch.cat([directions, torch.nn.functional.normalize(extra, dim=-1)])
-        steps = (longest * fractions)[None, :, None] * directions[:, None]  # (D, K, dim)
-        ends = torch.cat([q + steps.reshape(-1, len(direction)), goal[None]])
+        to_goal = goal - q[0]
+        gap = to_goal.norm()
+        rays = torch.cat([directions, (to_goal / gap)[None]])  # the goal is the one candidate on the last ray
+        dist = torch.cat([(longest * fractions).expand(len(directions), -1), gap.expand(1, candidates)])  # (R, K)
+        ends = q + dist[..., None] * rays[:, None]  # (R, K, dim)
+        ends = torch.cat([ends[:-1].reshape(-1, len(direction)), goal[None]])
 
         t_c, g_c = evaluate(ends)
         passes += 1
         t_c = t_c.clone()
         t_c[-1] = 0.0
 
-        free, cost = _segments(problem, q[0], ends, resolution)
+        free, cost = _rays(problem, q[0], rays, dist, resolution)
+        free, cost = torch.cat([free[:-1].reshape(-1), free[-1:, 0]]), torch.cat([cost[:-1].reshape(-1), cost[-1:, 0]])
         slack = cost + t_c - t_q
         long_enough = (ends - q).norm(dim=-1) >= min_step
         long_enough[-1] = True  # the goal
@@ -126,16 +131,27 @@ def ray_jump(
     return PlanResult(torch.stack(path), False)
 
 
-def _segments(problem: "Problem", q: Tensor, ends: Tensor, resolution: float) -> tuple[Tensor, Tensor]:
-    """For the straight segments q -> ends (C, dim): collision-free (sampled every `resolution` or finer, the start
-    excluded) and travel time ∫ ds / S* (midpoint rule on the same samples)."""
-    seg = ends - q
-    length = seg.norm(dim=-1)
+def _rays(problem: "Problem", q: Tensor, rays: Tensor, dist: Tensor, resolution: float) -> tuple[Tensor, Tensor]:
+    """For the candidates q + dist[r, k]·rays[r] (rays (R, dim) unit, dist (R, K)): whether the segment from q is
+    collision-free, and its travel time ∫ ds / S*. Each ray is sampled once, up to its longest candidate, every
+    `resolution` or finer (validity at the samples, the start excluded, and at each candidate; speed at the midpoints
+    between them); every candidate on it reads its own prefix (cumulative cost, interpolated)."""
+    r = len(dist)
+    dim = q.shape[-1]
+    length = dist.amax(dim=-1)  # (R,)
     n = max(1, math.ceil(float(length.max()) / resolution))
-    f = torch.arange(1, 2 * n + 1, dtype=q.dtype, device=q.device) / (2 * n)  # odd numerators: subsegment midpoints
-    pts = q + f[None, :, None] * seg[:, None]  # (C, 2n, dim)
-    flat = pts.reshape(-1, q.shape[-1])
-    free = problem.env.is_valid(flat).reshape(pts.shape[:2]).all(dim=-1)
-    speed = problem.speed_at(pts[:, 0::2].reshape(-1, q.shape[-1])).reshape(len(ends), n)
-    cost = length / n * (1 / speed).sum(dim=-1)
-    return free, cost.to(ends.dtype)
+    h = length / n  # (R,) sample spacing per ray
+    s = h[:, None] * torch.arange(1, n + 1, dtype=q.dtype, device=q.device)  # (R, n) distances of the samples
+    along = torch.cat([s, s - h[:, None] / 2, dist], dim=-1)  # samples, midpoints, candidates
+    pts = (q + along[..., None] * rays[:, None]).reshape(-1, dim)
+    valid = problem.env.is_valid(pts).reshape(r, -1)
+    speed = problem.speed_at(pts.reshape(r, -1, dim)[:, n : 2 * n].reshape(-1, dim)).reshape(r, n)
+
+    cum = torch.cat([torch.zeros_like(h)[:, None], (h[:, None] / speed.to(h)).cumsum(dim=-1)], dim=-1)  # (R, n + 1)
+    x = dist / h[:, None].clamp(min=torch.finfo(h.dtype).tiny)
+    i0 = x.floor().clamp(max=n - 1).long()
+    w = x - i0
+    cost = cum.gather(1, i0) * (1 - w) + cum.gather(1, i0 + 1) * w
+    first_invalid = torch.where(valid[:, :n], torch.inf, s).amin(dim=-1, keepdim=True)  # (R, 1)
+    free = (dist < first_invalid) & valid[:, 2 * n :]
+    return free, cost.to(dist.dtype)
