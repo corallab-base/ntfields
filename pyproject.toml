@@ -28,7 +28,6 @@ dev = [
     "pytorch-kinematics>=0.7",
     "ruff>=0.14",
     "scikit-fmm>=2024.5.29",
-    "torch-tensorrt>=2.14,<2.15; python_version >= '3.12'",
     "tyro>=0.9",
 ]
 

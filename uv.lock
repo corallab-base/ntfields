@@ -1019,7 +1019,6 @@ dev = [
     { name = "pytorch-kinematics" },
     { name = "ruff" },
     { name = "scikit-fmm" },
-    { name = "torch-tensorrt", marker = "python_full_version >= '3.12'" },
     { name = "tyro" },
 ]
 
@@ -1043,7 +1042,6 @@ dev = [
     { name = "pytorch-kinematics", specifier = ">=0.7" },
     { name = "ruff", specifier = ">=0.14" },
     { name = "scikit-fmm", specifier = ">=2024.5.29" },
-    { name = "torch-tensorrt", marker = "python_full_version >= '3.12'", specifier = ">=2.14,<2.15" },
     { name = "tyro", specifier = ">=0.9" },
 ]
 
