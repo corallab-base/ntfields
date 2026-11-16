@@ -31,6 +31,7 @@ class GoalField(Protocol):
 
     def travel_time(self, q: Tensor) -> Tensor: ...  # (B, dim) -> (B,)
     def gradient(self, q: Tensor) -> Tensor: ...  # (B, dim) -> ∇_q T (B, dim)
+    def travel_time_and_gradient(self, q: Tensor) -> tuple[Tensor, Tensor]: ...  # both from one evaluation
 
 
 @dataclass
@@ -46,10 +47,16 @@ class EncodedGoalField:
 
     def gradient(self, q: Tensor) -> Tensor:
         """∇_q T(q, q_g)."""
+        return self.travel_time_and_gradient(q)[1]
+
+    def travel_time_and_gradient(self, q: Tensor) -> tuple[Tensor, Tensor]:
+        """(T(q, q_g), ∇_q T(q, q_g)), from the inference model's gradient function, which computes both. Under a
+        TensorRT fp16 build, T comes from the float32 gradient engine, so it can differ from `travel_time` by the
+        fp16 rounding."""
         if self.inference.gradient is None:
             raise ValueError("this inference model has no gradients; use the TrainedField's")
         with torch.no_grad():
-            return self.inference.gradient(q, self.e_g)[1]
+            return self.inference.gradient(q, self.e_g)
 
 
 @dataclass

@@ -41,10 +41,15 @@ class GridField:
 
     def gradient(self, q: Tensor) -> Tensor:
         """∇_q T(q, goal) (B, dim), by autograd through the interpolation (0 outside `bounds`)."""
+        return self.travel_time_and_gradient(q)[1]
+
+    def travel_time_and_gradient(self, q: Tensor) -> tuple[Tensor, Tensor]:
+        """(T(q, goal), ∇_q T(q, goal)) from one interpolation and its backward pass."""
         with torch.enable_grad():
             q = q.detach().requires_grad_(True)
-            (g,) = torch.autograd.grad(self._interpolate(q).sum(), q)
-        return g
+            t = self._interpolate(q)
+            (g,) = torch.autograd.grad(t.sum(), q)
+        return t.detach(), g
 
     def _interpolate(self, q: Tensor) -> Tensor:
         return interpolate(self.values, self.bounds, q, self.interp)

@@ -57,6 +57,10 @@ def test_grid_field_gradient_matches_finite_differences(problem: Problem, interp
         [(gt.travel_time(q + h * e) - gt.travel_time(q - h * e)) / (2 * h) for e in torch.eye(2, dtype=q.dtype)], dim=-1
     )
     torch.testing.assert_close(gt.gradient(q), fd, atol=1e-5, rtol=1e-5)
+    t, g = gt.travel_time_and_gradient(q)
+    torch.testing.assert_close(t, gt.travel_time(q))
+    torch.testing.assert_close(g, gt.gradient(q))
+    assert not t.requires_grad and not g.requires_grad
 
 
 def test_cubic_passes_through_nodes(problem: Problem):
@@ -182,6 +186,9 @@ def test_towards_matches_pair_queries():
         target = field.towards(goal)
         torch.testing.assert_close(target.travel_time(q), field.travel_time(q, goal.expand_as(q)), msg=name)
         torch.testing.assert_close(target.gradient(q), field.gradient(q, goal.expand_as(q))[0], msg=name)
+        t, g = target.travel_time_and_gradient(q)
+        torch.testing.assert_close(t, target.travel_time(q), msg=name)
+        torch.testing.assert_close(g, target.gradient(q), msg=name)
 
 
 def test_mppi_reaches_goal_in_free_space():

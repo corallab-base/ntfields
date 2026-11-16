@@ -71,6 +71,10 @@ def test_accelerated_field_matches_field():
         torch.testing.assert_close(ours, expected)
     torch.testing.assert_close(fast.towards(goal).travel_time(q), field.towards(goal).travel_time(q))
     torch.testing.assert_close(fast.towards(goal).gradient(q), field.towards(goal).gradient(q))
+    for ours, expected in zip(
+        fast.towards(goal).travel_time_and_gradient(q), field.towards(goal).travel_time_and_gradient(q), strict=True
+    ):
+        torch.testing.assert_close(ours, expected)
 
 
 def test_accelerated_field_plans_as_the_field():
@@ -95,6 +99,8 @@ def test_gradients_are_absent_without_forward_mode_ones(monkeypatch: pytest.Monk
         fast.gradient(start[None], goal[None])
     with pytest.raises(ValueError, match="no gradients"):
         fast.towards(goal).gradient(start[None])
+    with pytest.raises(ValueError, match="no gradients"):
+        fast.towards(goal).travel_time_and_gradient(start[None])
     with pytest.raises(ValueError, match="no gradients"):
         fast.plan(start, goal, "gradient_bidirectional")
 
