@@ -26,6 +26,7 @@ def ray_jump(
     fan: int = 16,
     fan_retries: int = 3,
     max_eps: float = 0.5,
+    batch: int | None = None,
     generator: torch.Generator | None = None,
 ) -> PlanResult:
     """Long jumps down the field, each certified by its slack; one batched field evaluation per jump.
@@ -50,14 +51,29 @@ def ray_jump(
     Jumps shorter than `min_step` are never taken: there, T's rounding (float32) swamps the slack, and accepting them
     would crawl in place instead of fanning out.
 
+    Every field evaluation has the same batch size, `batch` (default: the largest pass, (1 + `fan`)·`candidates` + 1),
+    padded with copies of q, so a compiled or CUDA-graph field (`accelerate`) is specialized once, never during a
+    plan.
+
     `eps` can't go below the field's own error, relative to the jump: a trained field's needs `eps` ~ 0.1, the FMM's
     ~ 0.02. (An absolute allowance for it would let the planner crawl along ridges in short accepted steps instead of
     fanning out.)
     """
     problem = field.problem
     target = field.towards(goal)
+    size = (1 + fan) * candidates + 1 if batch is None else batch
+
+    def evaluate(points: Tensor) -> tuple[Tensor, Tensor]:
+        """T and ∇T at `points`, evaluated as a batch of exactly `size` (padded with copies of the first point)."""
+        n = len(points)
+        if n > size:
+            raise ValueError(f"a pass of {n} points exceeds batch={size}")
+        padded = torch.cat([points, points[:1].expand(size - n, -1)])
+        t, g = target.travel_time_and_gradient(padded)
+        return t[:n], g[:n]
+
     q = start[None]
-    t_q, g_q = target.travel_time_and_gradient(q)
+    t_q, g_q = evaluate(q)
     path, passes = [start], 1
     longest = float(t_q[0]) * max_speed
     fractions = min_fraction ** (torch.arange(candidates, dtype=start.dtype, device=start.device) / (candidates - 1))
@@ -79,7 +95,7 @@ def ray_jump(
         steps = (longest * fractions)[None, :, None] * directions[:, None]  # (D, K, dim)
         ends = torch.cat([q + steps.reshape(-1, len(direction)), goal[None]])
 
-        t_c, g_c = target.travel_time_and_gradient(ends)
+        t_c, g_c = evaluate(ends)
         passes += 1
         t_c = t_c.clone()
         t_c[-1] = 0.0

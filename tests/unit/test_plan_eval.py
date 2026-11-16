@@ -227,3 +227,37 @@ def test_ray_jump_plans_around_obstacle_within_its_bound(problem: Problem, start
     assert len(result.path) <= 8  # a few long jumps, not a descent
     t0 = float(field.towards(goal).travel_time(start_t[None]))
     assert _dense_cost(problem, result.path) <= t0 / (1 - eps) * 1.001  # the bound, up to the cost's quadrature
+
+
+class _ShapeRecordingField:
+    """Records the batch shape of every goal-field evaluation."""
+
+    def __init__(self, field: FMMField) -> None:
+        self.field, self.shapes = field, []
+
+    @property
+    def problem(self) -> Problem:
+        return self.field.problem
+
+    def towards(self, goal: torch.Tensor) -> "_ShapeRecordingGoalField":
+        return _ShapeRecordingGoalField(self.field.towards(goal), self.shapes)
+
+
+class _ShapeRecordingGoalField:
+    def __init__(self, inner: GridField, shapes: list[torch.Size]) -> None:
+        self.inner, self.shapes = inner, shapes
+
+    def travel_time_and_gradient(self, q: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        self.shapes.append(q.shape)
+        return self.inner.travel_time_and_gradient(q)
+
+
+def test_ray_jump_evaluates_one_batch_size(problem: Problem):
+    """So a compiled or CUDA-graph field is never specialized mid-plan: start, rays and fans all pad to one batch."""
+    recording = _ShapeRecordingField(FMMField(problem, resolution=101))
+    start, goal = torch.tensor([-0.6, 0.1], dtype=torch.float64), torch.tensor([0.6, -0.1], dtype=torch.float64)
+    result = ray_jump(recording, start, goal, fan=4, candidates=8, generator=torch.Generator().manual_seed(0))  # pyright: ignore[reportArgumentType]
+    assert result.success
+    assert len(recording.shapes) > 3 and set(recording.shapes) == {torch.Size([(1 + 4) * 8 + 1, 2])}
+    with pytest.raises(ValueError, match="exceeds batch"):
+        ray_jump(recording, start, goal, batch=8)  # pyright: ignore[reportArgumentType]
