@@ -35,6 +35,6 @@ def plan_succeeded(problem: Problem, result: PlanResult) -> bool:
 def travel_time_error(field: Field, gt: GridField, starts: Tensor) -> float:
     """Mean |T_field(start, goal) - T_gt(start)| over starts with a finite ground truth."""
     goals = gt.goal.to(starts).expand_as(starts)
-    t_gt = gt.value(starts)
+    t_gt = gt.travel_time(starts)
     finite = t_gt.isfinite()
     return float((field.travel_time(starts, goals) - t_gt).abs()[finite].mean())

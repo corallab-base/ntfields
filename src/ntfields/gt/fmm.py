@@ -12,13 +12,35 @@ SEED_RADIUS_DX = 1.5  # skfmm needs a zero contour that encloses at least one no
 
 @dataclass
 class GridField:
-    """Travel time to `goal` on a regular grid (array axis i = coordinate i), multilinearly interpolated."""
+    """Travel time to `goal` on a regular grid (array axis i = coordinate i), multilinearly interpolated.
+
+    A `GoalField`: queries on another device than `values` copy the grid each time, so move it once with `to`.
+    """
 
     values: Tensor  # (R,) * dim, float64
     bounds: Tensor  # (dim, 2)
     goal: Tensor  # (dim,)
 
-    def value(self, q: Tensor) -> Tensor:
+    @property
+    def device(self) -> torch.device:
+        return self.values.device
+
+    def to(self, device: torch.device | str) -> "GridField":
+        return GridField(self.values.to(device), self.bounds.to(device), self.goal.to(device))
+
+    def travel_time(self, q: Tensor) -> Tensor:
+        """T(q, goal) (B,) for q (B, dim), clamped to the grid outside `bounds`."""
+        with torch.no_grad():
+            return self._interpolate(q)
+
+    def gradient(self, q: Tensor) -> Tensor:
+        """∇_q T(q, goal) (B, dim), by autograd through the interpolation (0 outside `bounds`)."""
+        with torch.enable_grad():
+            q = q.detach().requires_grad_(True)
+            (g,) = torch.autograd.grad(self._interpolate(q).sum(), q)
+        return g
+
+    def _interpolate(self, q: Tensor) -> Tensor:
         lo, hi = self.bounds.to(q).unbind(-1)
         u = (2 * (q - lo) / (hi - lo) - 1).flip(-1)  # grid_sample wants (x, y[, z]) = reversed array axes
         dim = q.shape[-1]

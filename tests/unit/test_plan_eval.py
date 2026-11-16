@@ -3,7 +3,8 @@ import torch
 from ntfields import Problem, TrainedField
 from ntfields.envs import load_env
 from ntfields.eval import is_collision_free, path_cost, path_length, travel_time_error
-from ntfields.gt import fmm_travel_time
+from ntfields.field import GoalField
+from ntfields.gt import GridField, fmm_travel_time
 from ntfields.methods.euclidean import Euclidean, EuclideanConfig
 from ntfields.plan import mppi
 from ntfields.registry import create
@@ -23,14 +24,41 @@ def test_fmm_free_space_is_euclidean():
     problem = _empty()
     gt = fmm_travel_time(problem, torch.tensor([0.2, -0.3]), resolution=101)
     q = torch.tensor([[0.9, 0.9], [-0.7, 0.1], [0.25, -0.3]], dtype=torch.float64)
-    torch.testing.assert_close(gt.value(q), (q - gt.goal.double()).norm(dim=-1), atol=0.01, rtol=0)
+    torch.testing.assert_close(gt.travel_time(q), (q - gt.goal.double()).norm(dim=-1), atol=0.01, rtol=0)
     assert travel_time_error(_euclidean_field(problem), gt, q.float()) < 0.01
+
+
+def test_grid_field_is_a_goal_field():
+    gt: GoalField = fmm_travel_time(_empty(), torch.tensor([0.2, -0.3]), resolution=101)
+    assert isinstance(gt, GridField)
+    q = torch.tensor([[0.9, 0.9], [-0.7, 0.1]])
+    assert gt.travel_time(q).dtype == q.dtype
+
+
+def test_grid_field_gradient_in_free_space():
+    """In free space at full speed, ∇T is the unit vector away from the goal."""
+    goal = torch.tensor([0.2, -0.3])
+    gt = fmm_travel_time(_empty(), goal, resolution=201)
+    q = torch.tensor([[0.9, 0.9], [-0.7, 0.1], [0.6, -0.8]], dtype=torch.float64)
+    away = torch.nn.functional.normalize(q - goal.double(), dim=-1)
+    torch.testing.assert_close(gt.gradient(q), away, atol=0.03, rtol=0)
+    assert not gt.gradient(q).requires_grad
+
+
+def test_grid_field_gradient_matches_finite_differences(problem: Problem):
+    gt = fmm_travel_time(problem, torch.tensor([0.6, 0.0]), resolution=101)
+    q = torch.tensor([[-0.613, 0.057], [0.031, 0.607]], dtype=torch.float64)  # off grid lines, where it is smooth
+    h = 1e-6
+    fd = torch.stack(
+        [(gt.travel_time(q + h * e) - gt.travel_time(q - h * e)) / (2 * h) for e in torch.eye(2, dtype=q.dtype)], dim=-1
+    )
+    torch.testing.assert_close(gt.gradient(q), fd, atol=1e-5, rtol=1e-5)
 
 
 def test_fmm_detours_around_obstacle(problem: Problem):
     gt = fmm_travel_time(problem, torch.tensor([0.6, 0.0]), resolution=101)
     q = torch.tensor([[-0.6, 0.0]])
-    assert gt.value(q) > 1.2 * 1.2  # longer than the straight line, even at full speed
+    assert gt.travel_time(q) > 1.2 * 1.2  # longer than the straight line, even at full speed
 
 
 def test_path_metrics(problem: Problem):
