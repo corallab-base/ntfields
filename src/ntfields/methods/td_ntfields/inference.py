@@ -23,7 +23,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 
-from ntfields.inference import InferenceModel
+from ntfields.inference import InferenceModel, MPPIIterations
 from ntfields.methods.td_ntfields.model import GatedBlock, LipschitzLinear, TDMetricModel, metric_travel_time
 
 INSTANCE_NORM_EPS = 1e-5
@@ -38,7 +38,41 @@ def fold(model: TDMetricModel) -> InferenceModel:
         gradient=GoalTravelTimeGrad(embed, model),
         pair_gradient=PairTravelTimeGrad(embed, model),
         float16_weights=True,
+        mppi_iterations=FusedMPPI(embed, model),
     )
+
+
+class FusedMPPI:
+    """MPPIFactory of TD-NTFields' fused MPPI iterations (ntfields.methods.td_ntfields.triton_mppi), which
+    ntfields.accel keeps for the "triton" backend only."""
+
+    def __init__(self, embed: "FoldedEmbedding", model: TDMetricModel) -> None:
+        self.embed, self.group, self.temperature, self.out_scale = (
+            embed,
+            model.group,
+            model.temperature,
+            model.out_scale,
+        )
+
+    def __call__(
+        self,
+        start: Tensor,
+        e_g: Tensor,
+        chunk: int,
+        samples: int,
+        horizon: int,
+        step: float,
+        prior_gain: float,
+        first_weight: float,
+        temperature: float,
+        goal_tol: float,
+    ) -> MPPIIterations:
+        from ntfields.methods.td_ntfields.triton_mppi import FusedMPPIIterations
+
+        return FusedMPPIIterations(
+            self.embed, self.group, self.temperature, self.out_scale, start, e_g, chunk,
+            samples, horizon, step, prior_gain, first_weight, temperature, goal_tol,
+        )  # fmt: skip
 
 
 def fold_linear(layer: LipschitzLinear) -> nn.Linear:

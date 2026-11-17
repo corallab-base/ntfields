@@ -111,7 +111,13 @@ print(benchmark_ur5e(fast))
 ```
 
 On an RTX 3090, MPPI on the UR5e benchmark drops from 41 to 9 ms per plan (scenarios) and from 110 to 20 ms (random
-pairs), with the same success counts.
+pairs), with the same success counts. MPPI on an accelerated field also runs its iterations from CUDA graphs, eight
+per replay, with the eager loop's paths and random draws: on an RTX 4070, random pairs plan in 10 ms instead of 23.
+
+For TD-NTFields, `field.accelerate("triton")` (float32, CUDA) also runs each chunk of MPPI iterations as one
+persistent Triton kernel, the whole model and update included: 5.8 ms per random pair on an RTX 4070, with the same
+UR5e benchmark counts. Its matmuls sum in a different order, so paths match `"compile"`'s up to rounding, not bit
+for bit.
 
 With the `[tensorrt]` extra (Python 3.12+), `field.accelerate("tensorrt", precision="fp16")` builds a TensorRT engine
 per function on its first call; fp16 applies to the travel times only (TD-NTFields), the goal encoding and gradients

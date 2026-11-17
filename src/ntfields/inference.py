@@ -8,7 +8,7 @@ methods, which is what TrainedField queries through.
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, Protocol
 
 import torch
 from torch import Tensor
@@ -16,6 +16,40 @@ from torch import Tensor
 from ntfields.base import SceneCondition, TravelTimeModel
 
 Function = Literal["encode_goal", "travel_time", "pair_travel_time", "gradient", "pair_gradient"]
+
+
+class MPPIIterations(Protocol):
+    """A chunk of MPPI iterations (ntfields.plan.mppi) on static buffers, so it can be captured in a CUDA graph.
+
+    Each call runs the chunk from the state (q, prior) towards goal (with goal embedding e_g), leaves the state after
+    it, and writes each iteration's state to visited (chunk, dim) and whether it reached the goal to reached (chunk,).
+    It draws its noise from the default generator as the eager loop does: per iteration, (samples, 1, dim) then
+    (samples, horizon, dim)."""
+
+    q: Tensor
+    prior: Tensor
+    goal: Tensor
+    e_g: Tensor
+    visited: Tensor
+    reached: Tensor
+
+    def __call__(self) -> None: ...
+
+
+class MPPIFactory(Protocol):
+    def __call__(
+        self,
+        start: Tensor,
+        e_g: Tensor,
+        chunk: int,
+        samples: int,
+        horizon: int,
+        step: float,
+        prior_gain: float,
+        first_weight: float,
+        temperature: float,
+        goal_tol: float,
+    ) -> MPPIIterations: ...
 
 
 @dataclass
@@ -29,6 +63,8 @@ class InferenceModel:
     # the functions are nn.Modules that also run with float16 weights (`.half()`) on float32 inputs, giving float32
     # outputs (what a TensorRT fp16 build needs)
     float16_weights: bool = False
+    # fused MPPI iterations for this model (the "triton" accel backend's), else mppi runs the model per iteration
+    mppi_iterations: MPPIFactory | None = None
 
     def map(self, wrap: Callable[[Callable[..., Any]], Callable[..., Any]]) -> "InferenceModel":
         """The same model with every function it has wrapped (e.g. compiled)."""
@@ -39,6 +75,7 @@ class InferenceModel:
             None if self.gradient is None else wrap(self.gradient),
             None if self.pair_gradient is None else wrap(self.pair_gradient),
             self.float16_weights,
+            self.mppi_iterations,
         )
 
 

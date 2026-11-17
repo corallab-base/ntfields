@@ -100,6 +100,32 @@ def test_captured_mppi_plans_as_the_eager_loop():
     assert runs[0][1].success and len(runs[0][1].path) < 30  # stopped early, mid-chunk
 
 
+@requires_cuda
+def test_fused_mppi_plans_as_the_eager_loop():
+    """The triton backend's fused iterations draw the eager loop's noise and match its paths up to rounding (over a
+    few steps: on an untrained field rounding differences grow), stop where it stops, and leave the generator where
+    it does."""
+    field = _td_field(dtype=torch.float32, device="cuda")
+    start, goal = torch.tensor([-0.6, -0.3], device="cuda"), torch.tensor([0.5, 0.4], device="cuda")
+    runs, offsets = [], []
+    for f in (accelerate(field, "eager", cuda_graphs=False), accelerate(field, "triton")):
+        torch.manual_seed(0)
+        runs.append([mppi(f, start, goal, max_steps=12, goal_tol=g) for g in (0.01, 1.29)])
+        offsets.append(torch.cuda.default_generators[0].get_offset())
+    for eager, fused in zip(*runs, strict=True):
+        assert eager.success == fused.success
+        torch.testing.assert_close(fused.path, eager.path, rtol=0, atol=1e-5)
+    assert runs[0][1].success and len(runs[0][1].path) < 12  # stopped early, mid-chunk
+    assert offsets[0] == offsets[1]
+
+
+def test_triton_backend_needs_fused_iterations():
+    with pytest.raises(ValueError, match="no fused MPPI"):
+        accelerate(_pntfields_field(), "triton")
+    with pytest.raises(ValueError, match="needs a CUDA field"):
+        accelerate(_td_field(), "triton")
+
+
 def test_gradients_are_absent_without_forward_mode_ones(monkeypatch: pytest.MonkeyPatch):
     field = _td_field()
     values_only = replace(fold(cast(TDMetricModel, field.model)), gradient=None, pair_gradient=None)

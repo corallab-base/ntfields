@@ -8,6 +8,9 @@ Backends:
 - "eager": the inference form as is (folded weights, forward-mode gradients)
 - "compile": torch.compile (inductor) of each inference function, specialized per batch size (past torch._dynamo's
   recompile limit, 8 sizes per function, further sizes run eagerly)
+- "triton": "compile", and MPPI runs as the model's fused iterations (`InferenceModel.mppi_iterations`: for
+  TD-NTFields one persistent Triton kernel per chunk of iterations, ~2x faster than "compile" with CUDA graphs, with
+  paths that match up to rounding rather than bit for bit); float32 on CUDA
 - "tensorrt": a TensorRT engine per inference function, built on its first call with a dynamic batch within `batch`,
   in `precision` (see ntfields.accel.tensorrt; needs the [tensorrt] extra)
 
@@ -18,7 +21,7 @@ The scene is the environment's condition when `accelerate` is called: unlike a T
 not follow later changes to the environment (no model reads the scene yet).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 import torch
@@ -31,7 +34,7 @@ from ntfields.inference import InferenceModel
 from ntfields.plan import PLANNERS, PlanResult
 from ntfields.problem import Problem
 
-Backend = Literal["eager", "compile", "tensorrt"]
+Backend = Literal["eager", "compile", "triton", "tensorrt"]
 Precision = Literal["fp32", "fp16"]
 # on the UR5e MPPI benchmark, max-autotune builds in 52 s instead of 4 s and plans at most 15% faster; CUDA graphs
 # come from CudaGraphs, not inductor's modes
@@ -92,11 +95,18 @@ def accelerate(
     inference = field.model.inference_model(field.problem.env.condition())
     if inference is None:
         raise ValueError(f"{type(field.model).__name__} ({field.method.name}) has no inference model to accelerate")
-    if backend not in ("eager", "compile", "tensorrt"):
-        raise ValueError(f"unknown backend {backend!r}; available: eager, compile, tensorrt")
+    if backend not in ("eager", "compile", "triton", "tensorrt"):
+        raise ValueError(f"unknown backend {backend!r}; available: eager, compile, triton, tensorrt")
+    if backend == "triton":
+        if inference.mppi_iterations is None:
+            raise ValueError(f"{type(field.model).__name__} ({field.method.name}) has no fused MPPI iterations")
+        if field.device.type != "cuda":
+            raise ValueError("the triton backend needs a CUDA field")
+    else:
+        inference = replace(inference, mppi_iterations=None)
     if backend != "tensorrt" and precision != "fp32":
         raise ValueError(f"precision {precision!r} needs the tensorrt backend")
-    if backend == "compile":
+    if backend in ("compile", "triton"):
         inference = inference.map(lambda fn: torch.compile(fn, mode=COMPILE_MODE, dynamic=False))
     elif backend == "tensorrt":
         if field.device.type != "cuda":

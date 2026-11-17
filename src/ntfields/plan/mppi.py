@@ -1,3 +1,4 @@
+import functools
 import math
 import weakref
 from collections.abc import Callable
@@ -6,6 +7,7 @@ from typing import TYPE_CHECKING
 import torch
 from torch import Tensor
 
+from ntfields.inference import MPPIFactory, MPPIIterations
 from ntfields.plan.gradient_bidirectional import PlanResult
 
 if TYPE_CHECKING:
@@ -38,13 +40,15 @@ def mppi(
 
     On a field accelerated with CUDA graphs (and the default generator), the iterations run from a CUDA graph of
     `CHUNK` iterations, with no host sync until the goal can be within reach; the path and the generator's state
-    afterwards are the eager loop's.
+    afterwards are the eager loop's. With the "triton" backend, the chunk is the model's fused iterations
+    (`InferenceModel.mppi_iterations`), whose paths match the eager loop's up to the rounding of reordered sums.
     """
     target = field.towards(goal)
     args = (samples, horizon, step, prior_gain, first_weight, temperature, goal_tol)
-    captured = _captured_fn(target) if generator is None and start.is_cuda else None
+    captured = _iterations_factory(target) if generator is None and start.is_cuda else None
     if captured is not None:
-        return _CapturedMPPI.get(captured, start, *args).plan(target.e_g, start, goal, max_steps)
+        key, factory = captured
+        return _CapturedMPPI.get(key, factory, start, target.e_g, *args).plan(target.e_g, start, goal, max_steps)
     dim = start.shape[-1]
     q, prior = start.clone(), torch.zeros_like(start)
     path, reached = [start], False
@@ -70,36 +74,29 @@ def _randn(*shape: int, like: Tensor, generator: torch.Generator | None) -> Tens
     return torch.randn(shape, generator=generator, dtype=like.dtype, device=like.device)
 
 
-def _captured_fn(target: "GoalField") -> Callable[[Tensor, Tensor], Tensor] | None:
-    """The function under travel_time's CudaGraphs wrapper, if it has one (graphs cannot be captured inside graphs)."""
+def _iterations_factory(target: "GoalField") -> tuple[object, MPPIFactory] | None:
+    """(cache key, factory) for capturing MPPI iterations, if the field allows: the inference model's fused
+    iterations, or else the eager iterations over the function under travel_time's CudaGraphs wrapper (graphs cannot
+    be captured inside graphs)."""
     from ntfields.accel.cuda_graphs import CudaGraphs
 
+    if target.inference.mppi_iterations is not None:
+        return target.inference.mppi_iterations, target.inference.mppi_iterations
     fn = target.inference.travel_time
-    return fn.fn if isinstance(fn, CudaGraphs) else None  # pyright: ignore[reportReturnType]
+    if not isinstance(fn, CudaGraphs):
+        return None
+    return fn.fn, functools.partial(_TorchIterations, fn.fn)
 
 
-_CACHE: "weakref.WeakKeyDictionary[Callable[..., Tensor], dict[tuple[object, ...], _CapturedMPPI]]" = (
-    weakref.WeakKeyDictionary()
-)  # per travel_time function, per planner arguments
-
-
-class _CapturedMPPI:
-    """`CHUNK` MPPI iterations captured in one CUDA graph, on static buffers (state, goal embedding, visited states
-    and whether each reached the goal). The noise is drawn inside the graph from the default generator in the eager
-    loop's order, so a replay draws what CHUNK eager iterations would."""
-
-    @classmethod
-    def get(cls, fn: Callable[[Tensor, Tensor], Tensor], start: Tensor, *args: float) -> "_CapturedMPPI":
-        key = (start.shape, start.dtype, start.device, *args)
-        graphs = _CACHE.setdefault(fn, {})
-        if key not in graphs:
-            graphs[key] = cls(fn, start, *args)  # pyright: ignore[reportArgumentType]
-        return graphs[key]
+class _TorchIterations:
+    """MPPIIterations from the eager loop's operations, over a travel-time function fn(q, e_g)."""
 
     def __init__(
         self,
         fn: Callable[[Tensor, Tensor], Tensor],
         start: Tensor,
+        e_g: Tensor,
+        chunk: int,
         samples: int,
         horizon: int,
         step: float,
@@ -108,25 +105,20 @@ class _CapturedMPPI:
         temperature: float,
         goal_tol: float,
     ) -> None:
-        self.fn, self.samples, self.horizon, self.step = fn, samples, horizon, step
+        self.fn, self.chunk, self.samples, self.horizon, self.step = fn, chunk, samples, horizon, step
         self.prior_gain, self.first_weight, self.temperature, self.goal_tol = (
             prior_gain,
             first_weight,
             temperature,
             goal_tol,
         )
-        self.generator = torch.cuda.default_generators[start.device.index or 0]
-        self.q, self.prior, self.goal = start.clone(), torch.zeros_like(start), start.clone()
-        self.e_g: Tensor | None = None
-        self.visited = start.new_empty(CHUNK, start.shape[-1])
-        self.reached = torch.zeros(CHUNK, dtype=torch.bool, device=start.device)
-        self.graph: torch.cuda.CUDAGraph | None = None
-        self.offset_per_iteration = 0
+        self.q, self.prior, self.goal, self.e_g = start.clone(), torch.zeros_like(start), start.clone(), e_g.clone()
+        self.visited = start.new_empty(chunk, start.shape[-1])
+        self.reached = torch.zeros(chunk, dtype=torch.bool, device=start.device)
 
-    def _iterations(self) -> None:
-        assert self.e_g is not None
+    def __call__(self) -> None:
         dim, step = self.q.shape[-1], self.step
-        for i in range(CHUNK):
+        for i in range(self.chunk):
             noise = step * torch.randn(self.samples, 1, dim, dtype=self.q.dtype, device=self.q.device)
             noise = noise + step * torch.randn(
                 self.samples, self.horizon, dim, dtype=self.q.dtype, device=self.q.device
@@ -142,6 +134,28 @@ class _CapturedMPPI:
             self.visited[i].copy_(self.q)
             self.reached[i] = (self.goal - self.q).norm() < self.goal_tol
 
+
+_CACHE: "weakref.WeakKeyDictionary[object, dict[tuple[object, ...], _CapturedMPPI]]" = weakref.WeakKeyDictionary()
+
+
+class _CapturedMPPI:
+    """`CHUNK` MPPI iterations (MPPIIterations) captured in one CUDA graph. They draw their noise from the default
+    generator in the eager loop's order, so a replay draws what CHUNK eager iterations would."""
+
+    @classmethod
+    def get(cls, key: object, factory: MPPIFactory, start: Tensor, e_g: Tensor, *args: float) -> "_CapturedMPPI":
+        graphs = _CACHE.setdefault(key, {})
+        shape = (start.shape, start.dtype, start.device, *args)
+        if shape not in graphs:
+            graphs[shape] = cls(factory(start, e_g, CHUNK, *args), start, args[2], args[6])  # pyright: ignore[reportArgumentType]
+        return graphs[shape]
+
+    def __init__(self, iterations: MPPIIterations, start: Tensor, step: float, goal_tol: float) -> None:
+        self.it, self.step, self.goal_tol = iterations, step, goal_tol
+        self.generator = torch.cuda.default_generators[start.device.index or 0]
+        self.graph: torch.cuda.CUDAGraph | None = None
+        self.offset_per_iteration = 0
+
     def _capture(self) -> None:
         # warm up on a side stream (lazy initialization, autotuning), as torch.cuda.graph requires; the warm-up's
         # draws are rolled back so the first plan sees the generator as the eager loop would
@@ -151,12 +165,12 @@ class _CapturedMPPI:
             stream.wait_stream(torch.cuda.current_stream())
             with torch.cuda.stream(stream):
                 for _ in range(2):
-                    self._iterations()
+                    self.it()
             torch.cuda.current_stream().wait_stream(stream)
             self.generator.set_offset(offset)
             self.graph = torch.cuda.CUDAGraph()
             with torch.cuda.graph(self.graph):
-                self._iterations()
+                self.it()
             self.generator.set_offset(offset)
             self.graph.replay()
             self.offset_per_iteration, rem = divmod(self.generator.get_offset() - offset, CHUNK)
@@ -164,17 +178,16 @@ class _CapturedMPPI:
             self.generator.set_offset(offset)
 
     def plan(self, e_g: Tensor, start: Tensor, goal: Tensor, max_steps: int) -> PlanResult:
-        if self.e_g is None:
-            self.e_g = e_g.clone()
-        self.e_g.copy_(e_g)
-        self.goal.copy_(goal)
+        it = self.it
+        it.e_g.copy_(e_g)
+        it.goal.copy_(goal)
         if self.graph is None:
-            self.q.copy_(start)
-            self.prior.zero_()
+            it.q.copy_(start)
+            it.prior.zero_()
             self._capture()
         assert self.graph is not None
-        self.q.copy_(start)
-        self.prior.zero_()
+        it.q.copy_(start)
+        it.prior.zero_()
         offset = self.generator.get_offset()
         # each step is at most `step` long (a convex combination of steps clipped to it), so no iteration before
         # this one can reach the goal; checking is only skipped, never trusted, so rounding cannot change the path
@@ -182,8 +195,8 @@ class _CapturedMPPI:
         visited, reached, n, hit = [], [], 0, None
         while n < max_steps:
             self.graph.replay()
-            visited.append(self.visited.clone())
-            reached.append(self.reached.clone())
+            visited.append(it.visited.clone())
+            reached.append(it.reached.clone())
             n += CHUNK
             if n >= reachable:
                 hits = torch.cat(reached)[:max_steps].nonzero()
