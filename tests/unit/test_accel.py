@@ -84,6 +84,22 @@ def test_accelerated_field_plans_as_the_field():
     torch.testing.assert_close(paths[0], paths[1])
 
 
+@requires_cuda
+def test_captured_mppi_plans_as_the_eager_loop():
+    """MPPI from CUDA graphs gives the eager loop's paths, and leaves the generator where it would, so consecutive
+    plans match too."""
+    field = _td_field(dtype=torch.float32, device="cuda")
+    start, goal = torch.tensor([-0.6, -0.3], device="cuda"), torch.tensor([0.5, 0.4], device="cuda")
+    runs = []
+    for f in (accelerate(field, "eager", cuda_graphs=False), accelerate(field, "eager")):
+        torch.manual_seed(0)
+        runs.append([mppi(f, start, goal, max_steps=30, goal_tol=g) for g in (0.01, 1.29, 0.01)])
+    for eager, captured in zip(*runs, strict=True):
+        assert eager.success == captured.success
+        torch.testing.assert_close(captured.path, eager.path, rtol=0, atol=0)
+    assert runs[0][1].success and len(runs[0][1].path) < 30  # stopped early, mid-chunk
+
+
 def test_gradients_are_absent_without_forward_mode_ones(monkeypatch: pytest.MonkeyPatch):
     field = _td_field()
     values_only = replace(fold(cast(TDMetricModel, field.model)), gradient=None, pair_gradient=None)
