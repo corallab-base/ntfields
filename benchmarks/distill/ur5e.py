@@ -52,6 +52,9 @@ class Args:
     sampler: Literal["uniform", "surface", "mix", "nap", "nap_mix"] = "uniform"
     near_weight: float = 0.0  # DistillConfig.near_weight
     w_physics: float = 0.0  # weight of TD-NTFields' own loss (arm_ntrl recipe) on the same pairs
+    # train from scratch with TD-NTFields' own loss and arm recipe (TDNTFieldsConfig.arm: AdamW lr 5e-4, wd 0.5,
+    # gradient clipping 5, no rollback, as the teacher) at the student's size, instead of distilling
+    scratch: bool = False
     cosine: bool = False  # cosine LR decay to lr / 100 over the epochs
     seed: int = 0  # the student's init and shuffling
     tag: str = ""  # appended to result keys and file names
@@ -130,8 +133,10 @@ def _with_speed(problem: Problem, q_s: torch.Tensor, q_g: torch.Tensor) -> PairD
 
 
 def cat(*parts: PairDataset) -> PairDataset:
-    fields = ("q_s", "q_g", "speed_s", "speed_g", "normal_s", "normal_g")
-    return PairDataset(**{f: torch.cat([getattr(p, f) for p in parts]) for f in fields})
+    def c(field: str) -> torch.Tensor:
+        return torch.cat([getattr(p, field) for p in parts])
+
+    return PairDataset(c("q_s"), c("q_g"), c("speed_s"), c("speed_g"), c("normal_s"), c("normal_g"))
 
 
 def pairs_for(args: "Args", problem: Problem) -> PairDataset:
@@ -194,6 +199,14 @@ def main(args: Args) -> None:
         hidden, n_blocks = map(int, size.split("x"))
         cfg = replace(teacher.method.cfg, hidden=hidden, n_blocks=n_blocks, weight_decay=args.weight_decay, lr=args.lr)
         t0 = time.monotonic()
+        if args.scratch:
+            scratch_cfg = replace(TDNTFieldsConfig.arm(), hidden=hidden, n_blocks=n_blocks)
+            field = ntfields.train("td_ntfields", teacher.problem, Epochs(args.epochs), scratch_cfg, tc, data=pairs)
+            key = f"scratch {size} {name}"
+            results[key] = {**evaluate(field, teacher, q_s, q_g), "train_s": time.monotonic() - t0}
+            print(key, results[key], flush=True)
+            (args.out / f"results_scratch_{name}.json").write_text(json.dumps(results, indent=1))
+            continue
         field = ntfields.distill(
             teacher,
             "td_ntfields",
